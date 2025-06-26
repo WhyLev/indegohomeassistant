@@ -1,0 +1,117 @@
+type: vertical-stack
+cards:
+  - type: custom:mushroom-title-card
+    title: Daisy Dashboard
+    subtitle: Status deines Mähroboters
+  - type: vertical-stack
+    cards:
+      - type: picture-entity
+        entity: camera.indego_XXXXXXXXX
+        camera_view: auto
+        show_name: false
+        show_state: false
+        tap_action:
+          action: none
+        hold_action:
+          action: none
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_XXXXXXXXX_battery_percentage
+        name: Akku
+        icon: mdi:battery
+        icon_color: >
+          {% set level = states('sensor.indego_XXXXXXXXX_battery_percentage') | int %}
+          {% if level >= 80 %} green
+          {% elif level >= 50 %} yellow
+          {% elif level >= 20 %} orange
+          {% else %} red
+          {% endif %}
+  - type: grid
+    columns: 3
+    square: false
+    cards:
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_XXXXXXXXX_mower_state_detail
+        name: Status
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_XXXXXXXXX_last_completed
+        name: Letzter Mähdurchlauf
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_XXXXXXXXX_lawn_mowed
+        name: Gemähter Bereich
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_XXXXXXXXX_next_mow
+        name: Nächster Mähvorgang
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.indego_XXXXXXXXX_online
+        name: Online
+        icon_color: green
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.indego_XXXXXXXXX_update_available
+        name: Update Verfügbar
+        icon_color: red
+      - type: custom:mushroom-entity-card
+        entity: binary_sensor.indego_XXXXXXXXX_alert
+        name: Warnung
+        icon_color: red
+      - type: custom:mushroom-template-card
+        primary: Alle Warnungen löschen
+        icon: mdi:bell-remove-outline
+        icon_color: red
+        tap_action:
+          action: call-service
+          service: indego.delete_alert_all
+  - type: custom:mushroom-chips-card
+    chips:
+      - type: entity
+        entity: weather.home
+        name: Wetter
+        icon_color: blue
+      - type: template
+        content: |
+          {% if state_attr('weather.home', 'temperature') is not none %}
+            {{ state_attr('weather.home', 'temperature') }} °C
+          {% else %}
+            Temperatur unbekannt
+          {% endif %}
+      - type: template
+        content: >
+          {% if states('sensor.uv_index') not in ['unknown', 'unavailable', 'none'] %}
+            UV Index: {{ states('sensor.uv_index') }}
+          {% else %}
+            UV Index: nicht verfügbar
+          {% endif %}
+      - type: template
+        content: >
+          {% set f=state_attr('weather.home','forecast') %}
+          {% if f and (f[:4]|selectattr('precipitation','>',0)|list)|length %}
+            🌧️ Regen in 4 h
+          {% else %}
+            ☀️ Kein Regen
+          {% endif %}
+  - type: grid
+    columns: 3
+    cards:
+      - type: custom:mushroom-template-card
+        icon: mdi:play
+        primary: Start
+        tap_action:
+          action: call-service
+          service: indego.command
+          data:
+            command: mow
+      - type: custom:mushroom-template-card
+        icon: mdi:pause
+        primary: Pause
+        tap_action:
+          action: call-service
+          service: indego.command
+          data:
+            command: pause
+      - type: custom:mushroom-template-card
+        icon: mdi:home
+        primary: Zurück zur Station
+        tap_action:
+          action: call-service
+          service: indego.command
+          data:
+            command: returnToDock

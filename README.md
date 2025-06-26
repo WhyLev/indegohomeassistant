@@ -1,2 +1,138 @@
-# indegohomeassistant
-Eine moderne und umfassende Home Assistant Integration für Bosch Indego Mähroboter – mit Karte, Statusanzeigen, Wetterdaten, Steuerung und stilvollem Dashboard.
+# Indego Home Assistant Integration
+
+
+Join the [Discord community](https://discord.gg/aD33GsP) to ask questions, share feedback, and help shape future development!
+
+---
+
+## 🌱 Overview
+
+**Indego Home Assistant** is a custom component for Bosch Indego robotic lawn mowers. It offers real-time mower data, control commands, map rendering, and a beautiful Lovelace dashboard using Mushroom, ApexCharts, and Card Mod.
+
+This fork combines the solid Bosch Indego integration developed by [sander1988](https://github.com/sander1988) with the camera and feature enhancements introduced by [kimzeuner](https://github.com/kimzeuner), while the new UI/UX design and dashboard were created by myself.
+
+---
+
+## ⚙️ Features
+
+* OAuth2 login via Bosch SingleKey ID
+* Real-time state, mowing progress, battery status
+* Camera map view (rendered map)
+* Alert and error handling with delete/read actions
+* Service commands: mow, pause, return to dock
+* SmartMowing toggling
+* Mushroom-based Lovelace dashboard with
+
+  * Status grid
+  * Battery widget
+  * Command buttons
+  * Alert deletion
+  * Weather chips (OpenWeatherMap + OpenUV)
+
+---
+
+## 🔧 Installation
+
+### Option 1: Manual
+
+1. Copy `custom_components/indego` into your Home Assistant config directory
+2. Restart Home Assistant
+
+---
+
+## 🌐 Authentication Setup
+
+Bosch requires login via **SingleKey ID** with OAuth2. Due to CORS restrictions, authentication requires **Google Chrome** and a **temporary extension**.
+
+### Chrome Extension Setup
+
+1. Download [chrome-extension.zip](/chrome-extension.zip)
+2. Unzip it
+3. Open `chrome://extensions/`
+4. Enable *Developer mode* (top right)
+5. Click *Load unpacked*, select unzipped folder
+6. Authenticate via Home Assistant: *Settings > Devices & Services > Add Integration > Bosch Indego Mower*
+
+After linking, you can disable/remove the extension.
+
+> Note: You can add multiple Indego devices individually.
+
+---
+
+## 🪡 Entities & Sensors
+
+All entities are auto-discovered and appear under *unused entities* after integration.
+
+| Function           | Entity                                           |
+| ------------------ | ------------------------------------------------ |
+| Mower state        | `sensor.indego_xxxxxxxx_mower_state`             |
+| Mower state detail | `sensor.indego_xxxxxxxx_mower_state_detail`      |
+| Lawn mowed %       | `sensor.indego_xxxxxxxx_lawn_mowed`              |
+| Total runtime      | `sensor.indego_xxxxxxxx_runtime_total`           |
+| Battery percentage | `sensor.indego_xxxxxxxx_battery_percentage`      |
+| Alerts present     | `binary_sensor.indego_xxxxxxxx_alert`            |
+| Last completed     | `sensor.indego_xxxxxxxx_last_completed`          |
+| Next scheduled mow | `sensor.indego_xxxxxxxx_next_mow`                |
+| Mowing mode        | `sensor.indego_xxxxxxxx_mowing_mode`             |
+| Online state       | `binary_sensor.indego_xxxxxxxx_online`           |
+| Update available   | `binary_sensor.indego_xxxxxxxx_update_available` |
+| Camera map         | `camera.indego_xxxxxxxx`                         |
+
+---
+
+## 🚜 Services
+
+You can call the following services:
+
+| Service                   | Purpose                                |
+| ------------------------- | -------------------------------------- |
+| `indego.command`          | Send `mow`, `pause`, or `returnToDock` |
+| `indego.smartmowing`      | Toggle SmartMowing on/off              |
+| `indego.read_alert`       | Mark one alert as read                 |
+| `indego.read_alert_all`   | Mark all alerts as read                |
+| `indego.delete_alert`     | Delete one alert                       |
+| `indego.delete_alert_all` | Delete all alerts                      |
+
+---
+
+## 📊 Dashboard
+
+A complete Mushroom-based dashboard is included in `/dashboard/lovelace.yaml`. Highlights:
+
+* Picture-entity with camera map
+* Battery widget (colored icon)
+* Status grid (state, lawn mowed, last/next mow, alerts, updates)
+* Weather chips (OpenWeather, OpenUV)
+* Command buttons (Start, Pause, Dock)
+
+Required HACS Frontend Cards:
+
+* [Mushroom](https://github.com/piitaya/lovelace-mushroom)
+* [Card Mod](https://github.com/thomasloven/lovelace-card-mod)
+* [ApexCharts Card](https://github.com/RomRider/apexcharts-card)
+* [Vertical Stack in Card](https://github.com/ofekashery/vertical-stack-in-card)
+* [OpenUV](https://www.home-assistant.io/integrations/openuv/)
+
+---
+
+## 🌿 Supported Mower Models
+
+See full list [here](https://github.com/sander1988/Indego#supported-models). All Indego models are supported.
+
+---
+
+## ❤️ Credits
+
+* Special thanks to [**kimzeuner**](https://github.com/kimzeuner) for the Camera-System
+* Gratitude to [**sander1988**](https://github.com/sander1988) for the OAuth-based Indego integration
+* Based on [iMarkus/Indego](https://github.com/iMarkus/Indego) and ideas from [grauonline.de](http://grauonline.de/wordpress/?page_id=219)
+
+---
+
+## 🙋 Support
+
+For issues, open a [GitHub Issue](https://github.com/WhyLev/indegohomeassistant/issues) or join the [Discord](https://discord.gg/aD33GsP).
+
+> Pull Requests welcome! Help improve features, translations, or dashboards.
+
+---
