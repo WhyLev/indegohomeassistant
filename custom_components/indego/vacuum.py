@@ -98,7 +98,7 @@ class IndegoVacuum(IndegoEntity, StateVacuumEntity):
         self._indego_hub = indego_hub
         self._attr_supported_features = INDEGO_VACUUM_FEATURES
         self._attr_indego_state = None
-        self._attr_state = None
+        self._attr_activity = None
         self._attr_battery_level = None
         self._attr_battery_charging = False
 
@@ -123,16 +123,18 @@ class IndegoVacuum(IndegoEntity, StateVacuumEntity):
     def indego_state(self, indego_state: int):
         """Set the mower state by converting the Indego mower state to a vacuum state."""
         self._attr_indego_state = indego_state
-        new_state = INDEGO_STATE_TO_VACUUM_MAPPING[indego_state] \
-            if indego_state in INDEGO_STATE_TO_VACUUM_MAPPING \
+        new_activity = (
+            INDEGO_STATE_TO_VACUUM_MAPPING[indego_state]
+            if indego_state in INDEGO_STATE_TO_VACUUM_MAPPING
             else None
+        )
 
-        if self._attr_state != new_state:
-            self._attr_state = new_state
+        if self._attr_activity != new_activity:
+            self._attr_activity = new_activity
             self.async_schedule_update_ha_state()
-            _LOGGER.debug("Mower/vacuum state updated to: %s", self._attr_state)
+            _LOGGER.debug("Mower/vacuum activity updated to: %s", self._attr_activity)
 
-            if self._attr_state is None:
+            if self._attr_activity is None:
                 _LOGGER.warning("Received unsupported Indego mower state: %i", indego_state)
 
     @property

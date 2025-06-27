@@ -80,8 +80,10 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Last completed     | `sensor.indego_xxxxxxxx_last_completed`          |
 | Next scheduled mow | `sensor.indego_xxxxxxxx_next_mow`                |
 | Mowing mode        | `sensor.indego_xxxxxxxx_mowing_mode`             |
+| Garden size        | `sensor.indego_xxxxxxxx_garden_size`             |
 | Online state       | `binary_sensor.indego_xxxxxxxx_online`           |
 | Update available   | `binary_sensor.indego_xxxxxxxx_update_available` |
+| Firmware version   | `sensor.indego_xxxxxxxx_firmware_version`        |
 | Camera map         | `camera.indego_xxxxxxxx`                         |
 
 ---
