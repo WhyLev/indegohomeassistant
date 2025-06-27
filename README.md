@@ -84,6 +84,7 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Online state       | `binary_sensor.indego_xxxxxxxx_online`           |
 | Update available   | `binary_sensor.indego_xxxxxxxx_update_available` |
 | Firmware version   | `sensor.indego_xxxxxxxx_firmware_version`        |
+| Serial number      | `sensor.indego_xxxxxxxx_serial_number`           |
 | Camera map         | `camera.indego_xxxxxxxx`                         |
 
 ---

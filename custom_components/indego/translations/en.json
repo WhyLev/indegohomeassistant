@@ -11,7 +11,8 @@
                 "data": {
                     "user_agent": "User-Agent",
                     "expose_mower": "Expose Indego mower as mower entity in HomeAssistant",
-                    "expose_vacuum": "Expose Indego mower as vacuum entity in HomeAssistant"
+                    "expose_vacuum": "Expose Indego mower as vacuum entity in HomeAssistant",
+                    "position_update_interval": "Position update interval (seconds)"
                 },
                 "description": "Advanced settings of the Bosch Indego component."
             },
@@ -37,8 +38,9 @@
                   "user_agent": "User-Agent",
                   "expose_mower": "Expose Indego mower as mower entity in HomeAssistant",
                   "expose_vacuum": "Expose Indego mower as vacuum entity in HomeAssistant",
-                  "show_all_alerts": "Show the full alert history into HomeAssistant. This is not recommended for most users, it might have a significant impact on the HomeAssistant database size!"
-              }
+                    "show_all_alerts": "Show the full alert history into HomeAssistant. This is not recommended for most users, it might have a significant impact on the HomeAssistant database size!",
+                    "position_update_interval": "Position update interval (seconds)"
+                }
           }
       }
     },

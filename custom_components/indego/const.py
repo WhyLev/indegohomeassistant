@@ -24,6 +24,9 @@ CONF_ATTR: Final = "attributes"
 CONF_SEND_COMMAND: Final = "command"
 CONF_SMARTMOWING: Final = "enable"
 CONF_POLLING: Final = "polling"
+CONF_POSITION_UPDATE_INTERVAL: Final = "position_update_interval"
+
+DEFAULT_POSITION_UPDATE_INTERVAL: Final = 60
 
 DEFAULT_NAME: Final = "Indego"
 DEFAULT_NAME_COMMANDS: Final = None
@@ -59,6 +62,7 @@ ENTITY_VACUUM: Final = "vacuum"
 ENTITY_LAWN_MOWER: Final = "lawn_mower"
 ENTITY_GARDEN_SIZE: Final = "garden_size"
 ENTITY_FIRMWARE: Final = "firmware_version"
+ENTITY_SERIAL_NUMBER: Final = "serial_number"
 ENTITY_CAMERA: Final = "camera"
 
 HTTP_HEADER_USER_AGENT: Final = "User-Agent"
