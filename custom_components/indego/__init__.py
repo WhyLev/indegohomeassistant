@@ -221,6 +221,14 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: None,
         CONF_ATTR: [],
     },
+    ENTITY_SERIAL_NUMBER: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "serial number",
+        CONF_ICON: "mdi:identifier",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: None,
+        CONF_ATTR: [],
+    },
     ENTITY_CAMERA: {
         CONF_TYPE: CAMERA_TYPE,
     },
@@ -253,7 +261,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             CONF_SHOW_ALL_ALERTS: entry.options.get(CONF_SHOW_ALL_ALERTS, False),
         },
         hass,
-        entry.options.get(CONF_USER_AGENT)
+        entry.options.get(CONF_USER_AGENT),
+        entry.options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL)
     )
 
     await indego_hub.start_periodic_position_update()
@@ -430,7 +439,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class IndegoHub:
     """Class for the IndegoHub, which controls the sensors and binary sensors."""
 
-    def __init__(self, name: str, session: IndegoOAuth2Session, serial: str, features: dict, hass: HomeAssistant, user_agent: Optional[str] = None):
+    def __init__(self, name: str, session: IndegoOAuth2Session, serial: str, features: dict, hass: HomeAssistant, user_agent: Optional[str] = None, position_interval: int = DEFAULT_POSITION_UPDATE_INTERVAL):
         """Initialize the IndegoHub.
 
         Args:
@@ -456,6 +465,7 @@ class IndegoHub:
         self._unsub_map_timer = None
         self._last_position = (None, None)
         self._last_state = None
+        self._position_interval = position_interval
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -483,7 +493,7 @@ class IndegoHub:
         for entity_key, entity in ENTITY_DEFINITIONS.items():
             if entity[CONF_TYPE] == SENSOR_TYPE:
                 self.entities[entity_key] = IndegoSensor(
-                    f"indego_{self._serial}_{entity_key}",
+                    f"indego_{entity_key}",
                     f"{self._mower_name} {entity[CONF_NAME]}",
                     entity[CONF_ICON],
                     entity[CONF_DEVICE_CLASS],
@@ -492,10 +502,15 @@ class IndegoHub:
                     device_info,
                     translation_key=entity[CONF_TRANSLATION_KEY] if CONF_TRANSLATION_KEY in entity else None,
                 )
+                if entity_key == ENTITY_SERIAL_NUMBER:
+                    # Avoid scheduling a state update before the entity is
+                    # added to Home Assistant by setting the protected
+                    # attribute directly.
+                    self.entities[entity_key]._state = self._serial
 
             elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
                 self.entities[entity_key] = IndegoBinarySensor(
-                    f"indego_{self._serial}_{entity_key}",
+                    f"indego_{entity_key}",
                     f"{self._mower_name} {entity[CONF_NAME]}",
                     entity[CONF_ICON],
                     entity[CONF_DEVICE_CLASS],
@@ -507,7 +522,7 @@ class IndegoHub:
             elif entity[CONF_TYPE] == LAWN_MOWER_TYPE:
                 if self._features[CONF_EXPOSE_INDEGO_AS_MOWER]:
                     self.entities[entity_key] = IndegoLawnMower(
-                        f"indego_{self._serial}",
+                        "indego",
                         self._mower_name,
                         device_info,
                         self
@@ -516,7 +531,7 @@ class IndegoHub:
             elif entity[CONF_TYPE] == VACUUM_TYPE:
                 if self._features[CONF_EXPOSE_INDEGO_AS_VACUUM]:
                     self.entities[entity_key] = IndegoVacuum(
-                        f"indego_{self._serial}",
+                        "indego",
                         self._mower_name,
                         device_info,
                         self
@@ -524,7 +539,7 @@ class IndegoHub:
 
             elif entity[CONF_TYPE] == CAMERA_TYPE:
                 self.entities[entity_key] = IndegoCamera(
-                    f"indego_{self._serial}",
+                    "indego",
                     self._mower_name,
                     device_info,
                     self
@@ -715,9 +730,11 @@ class IndegoHub:
         except Exception as e:
             _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
 
-    async def start_periodic_position_update(self):
+    async def start_periodic_position_update(self, interval: int | None = None):
+        if interval is None:
+            interval = self._position_interval
         self._unsub_map_timer = async_track_time_interval(
-            self._hass, self._check_position_and_state, timedelta(seconds=60)
+            self._hass, self._check_position_and_state, timedelta(seconds=interval)
         )
 
     async def _check_position_and_state(self, now):

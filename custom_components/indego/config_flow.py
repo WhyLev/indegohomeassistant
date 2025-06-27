@@ -22,6 +22,8 @@ from .const import (
     CONF_EXPOSE_INDEGO_AS_VACUUM,
     CONF_SHOW_ALL_ALERTS,
     CONF_USER_AGENT,
+    CONF_POSITION_UPDATE_INTERVAL,
+    DEFAULT_POSITION_UPDATE_INTERVAL,
     OAUTH2_CLIENT_ID,
     HTTP_HEADER_USER_AGENT,
     HTTP_HEADER_USER_AGENT_DEFAULT,
@@ -79,6 +81,10 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
                 vol.Optional(
                     CONF_SHOW_ALL_ALERTS, default=self.options.get(CONF_SHOW_ALL_ALERTS, False)
                 ): bool,
+                vol.Optional(
+                    CONF_POSITION_UPDATE_INTERVAL,
+                    default=self.options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL),
+                ): int,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
@@ -168,6 +174,7 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
 
             self._options[CONF_EXPOSE_INDEGO_AS_MOWER] = user_input[CONF_EXPOSE_INDEGO_AS_MOWER]
             self._options[CONF_EXPOSE_INDEGO_AS_VACUUM] = user_input[CONF_EXPOSE_INDEGO_AS_VACUUM]
+            self._options[CONF_POSITION_UPDATE_INTERVAL] = user_input[CONF_POSITION_UPDATE_INTERVAL]
 
             try:
                 self._mower_serials = await api_client.get_mowers()
@@ -212,6 +219,10 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
                 vol.Optional(
                     CONF_EXPOSE_INDEGO_AS_VACUUM, default=(self._options[CONF_EXPOSE_INDEGO_AS_VACUUM] if CONF_EXPOSE_INDEGO_AS_VACUUM in self._options else False)
                 ): bool,
+                vol.Optional(
+                    CONF_POSITION_UPDATE_INTERVAL,
+                    default=(self._options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL))
+                ): int,
             }
         )
         return self.async_show_form(step_id="advanced", data_schema=schema)
