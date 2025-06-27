@@ -6,7 +6,7 @@ cards:
   - type: vertical-stack
     cards:
       - type: picture-entity
-        entity: camera.indego_XXXXXXXXX
+        entity: camera.indego
         camera_view: auto
         show_name: false
         show_state: false
@@ -15,42 +15,39 @@ cards:
         hold_action:
           action: none
       - type: custom:mushroom-entity-card
-        entity: sensor.indego_XXXXXXXXX_battery_percentage
+        entity: sensor.indego_battery_percentage
         name: Akku
         icon: mdi:battery
         icon_color: >
-          {% set level = states('sensor.indego_XXXXXXXXX_battery_percentage') | int %}
-          {% if level >= 80 %} green
-          {% elif level >= 50 %} yellow
-          {% elif level >= 20 %} orange
-          {% else %} red
-          {% endif %}
+          {% set level = states('sensor.indego_battery_percentage') |
+          int %} {% if level >= 80 %} green {% elif level >= 50 %} yellow {%
+          elif level >= 20 %} orange {% else %} red {% endif %}
   - type: grid
     columns: 3
     square: false
     cards:
       - type: custom:mushroom-entity-card
-        entity: sensor.indego_XXXXXXXXX_mower_state_detail
+        entity: sensor.indego_mower_state_detail
         name: Status
       - type: custom:mushroom-entity-card
-        entity: sensor.indego_XXXXXXXXX_last_completed
+        entity: sensor.indego_last_completed
         name: Letzter Mähdurchlauf
       - type: custom:mushroom-entity-card
-        entity: sensor.indego_XXXXXXXXX_lawn_mowed
+        entity: sensor.indego_lawn_mowed
         name: Gemähter Bereich
       - type: custom:mushroom-entity-card
-        entity: sensor.indego_XXXXXXXXX_next_mow
+        entity: sensor.indego_next_mow
         name: Nächster Mähvorgang
       - type: custom:mushroom-entity-card
-        entity: binary_sensor.indego_XXXXXXXXX_online
+        entity: binary_sensor.indego_online
         name: Online
         icon_color: green
       - type: custom:mushroom-entity-card
-        entity: binary_sensor.indego_XXXXXXXXX_update_available
+        entity: binary_sensor.indego_update_available
         name: Update Verfügbar
         icon_color: red
       - type: custom:mushroom-entity-card
-        entity: binary_sensor.indego_XXXXXXXXX_alert
+        entity: binary_sensor.indego_alert
         name: Warnung
         icon_color: red
       - type: custom:mushroom-template-card
@@ -75,15 +72,16 @@ cards:
           {% endif %}
       - type: template
         content: >
-          {% if states('sensor.uv_index') not in ['unknown', 'unavailable', 'none'] %}
+          {% if states('sensor.uv_index') not in ['unknown', 'unavailable',
+          'none'] %}
             UV Index: {{ states('sensor.uv_index') }}
           {% else %}
             UV Index: nicht verfügbar
           {% endif %}
       - type: template
         content: >
-          {% set f=state_attr('weather.home','forecast') %}
-          {% if f and (f[:4]|selectattr('precipitation','>',0)|list)|length %}
+          {% set f=state_attr('weather.home','forecast') %} {% if f and
+          (f[:4]|selectattr('precipitation','>',0)|list)|length %}
             🌧️ Regen in 4 h
           {% else %}
             ☀️ Kein Regen
