@@ -57,6 +57,12 @@ After linking, you can disable/remove the extension.
 
 > Note: You can add multiple Indego devices individually.
 
+### Alternative OAuth Helper
+
+If you prefer not to use Chrome, run `auth_proxy.py` from this repository. It
+starts a small web server that forwards the OAuth callback to Home Assistant.
+Open the printed URL, complete the login and the token will be sent to HA.
+
 ---
 
 ## 🪡 Entities & Sensors
