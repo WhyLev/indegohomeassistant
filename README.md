@@ -2,6 +2,7 @@
 
 
 Join the [Discord community](https://discord.gg/aD33GsP) to ask questions, share feedback, and help shape future development!
+
 Read the [Wiki](https://github.com/WhyLev/indegohomeassistant/wiki/Indego-Home-Assistant-Integration) for help
 ---
 
