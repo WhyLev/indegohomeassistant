@@ -18,9 +18,11 @@ This fork combines the solid Bosch Indego integration developed by [sander1988](
 * OAuth2 login via Bosch SingleKey ID
 * Real-time state, mowing progress, battery status
 * Static map camera plus animated progress camera (resets after 24h or on completion)
+* Progress path line width set by `MAP_PROGRESS_LINE_WIDTH` (default 6px)
 * Alert and error handling with delete/read actions
 * Service commands: mow, pause, return to dock
 * SmartMowing toggling
+* Map position updates every 10 seconds by default (configurable)
 * Forecast sensor with rain probability & mow suggestion
 * Mushroom-based Lovelace dashboard with
 
@@ -82,6 +84,9 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Battery percentage | `sensor.indego_battery_percentage`      |
 | Ambient temperature | `sensor.indego_ambient_temperature`    |
 | Battery temperature | `sensor.indego_battery_temperature`    |
+| Battery cycles      | `sensor.indego_battery_cycles`         |
+| Average mow time    | `sensor.indego_average_mow_time`       |
+| Weekly mowed area   | `sensor.indego_weekly_area`            |
 | Alerts present     | `binary_sensor.indego_alert`            |
 | Last completed     | `sensor.indego_last_completed`          |
 | Next scheduled mow | `sensor.indego_next_mow`                |
@@ -94,6 +99,34 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Serial number      | `sensor.indego_serial_number`           |
 | Camera map         | `camera.indego` (static)                |
 | Progress camera    | `camera.indego_progress`                |
+
+### Automation Examples
+
+Use these sensors to build automations. Examples:
+
+```yaml
+- alias: Notify when mower battery cycles high
+  trigger:
+    - platform: numeric_state
+      entity_id: sensor.indego_battery_cycles
+      above: 500
+  action:
+    - service: notify.mobile_app_phone
+      data:
+        message: "Indego battery has reached 500 cycles."
+```
+
+```yaml
+- alias: Log weekly mowed area
+  trigger:
+    - platform: time
+      at: "23:59:00"
+  action:
+    - service: system_log.write
+      data:
+        message: "Mowed area this week: {{ states('sensor.indego_weekly_area') }} m²"
+```
+
 
 ---
 

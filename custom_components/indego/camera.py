@@ -13,7 +13,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, MAP_PROGRESS_LINE_WIDTH
 from .mixins import IndegoEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -103,7 +103,7 @@ class IndegoCamera(IndegoEntity, Camera):
                     last_x, last_y = self._positions[-1]
                     self._path_svg += (
                         f'<line x1="{last_x}" y1="{last_y}" x2="{xpos}" y2="{ypos}" '
-                        f'stroke="#808080" stroke-width="4" stroke-linecap="round" />'
+                        f'stroke="#808080" stroke-width="{MAP_PROGRESS_LINE_WIDTH}" stroke-linecap="round" />'
                     )
                 self._positions.append((xpos, ypos))
 

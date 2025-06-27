@@ -73,6 +73,9 @@ ENTITY_SERIAL_NUMBER: Final = "serial_number"
 ENTITY_CAMERA: Final = "camera"
 ENTITY_CAMERA_PROGRESS: Final = "camera_progress"
 ENTITY_FORECAST: Final = "forecast"
+ENTITY_BATTERY_CYCLES: Final = "battery_cycles"
+ENTITY_AVERAGE_MOW_TIME: Final = "average_mow_time"
+ENTITY_WEEKLY_AREA: Final = "weekly_area"
 
 HTTP_HEADER_USER_AGENT: Final = "User-Agent"
 HTTP_HEADER_USER_AGENT_DEFAULT: Final = "HA/Indego"
@@ -80,3 +83,6 @@ HTTP_HEADER_USER_AGENT_DEFAULTS: Final = [
     "HomeAssistant/Indego",
     "HA/Indego"
 ]
+
+# Width of progress lines drawn on the map camera (in pixels)
+MAP_PROGRESS_LINE_WIDTH: Final = 6
