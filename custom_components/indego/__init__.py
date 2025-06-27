@@ -223,6 +223,30 @@ ENTITY_DEFINITIONS = {
             "total_operation_time_h",
         ],
     },
+    ENTITY_TOTAL_MOWING_TIME: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "total mowing time",
+        CONF_ICON: "mdi:clock-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "h",
+        CONF_ATTR: [],
+    },
+    ENTITY_TOTAL_CHARGING_TIME: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "total charging time",
+        CONF_ICON: "mdi:clock-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "h",
+        CONF_ATTR: [],
+    },
+    ENTITY_TOTAL_OPERATION_TIME: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "total operation time",
+        CONF_ICON: "mdi:clock-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "h",
+        CONF_ATTR: [],
+    },
     ENTITY_VACUUM: {
         CONF_TYPE: VACUUM_TYPE,
     },
@@ -823,6 +847,11 @@ class IndegoHub:
                     f"ambient_temp_{UnitOfTemperature.CELSIUS}": self._indego_client.operating_data.battery.ambient_temp,
                 }
             )
+
+            runtime = self._indego_client.operating_data.runtime
+            self.entities[ENTITY_TOTAL_OPERATION_TIME].state = runtime.total.operate
+            self.entities[ENTITY_TOTAL_MOWING_TIME].state = runtime.total.cut
+            self.entities[ENTITY_TOTAL_CHARGING_TIME].state = runtime.total.charge
 
     def set_online_state(self, online: bool):
         _LOGGER.debug("Set online state: %s", online)

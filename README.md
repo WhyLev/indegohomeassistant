@@ -76,6 +76,9 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Mower state detail | `sensor.indego_mower_state_detail`      |
 | Lawn mowed %       | `sensor.indego_lawn_mowed`              |
 | Total runtime      | `sensor.indego_runtime_total`           |
+| Total mowing time  | `sensor.indego_total_mowing_time`       |
+| Total charging time| `sensor.indego_total_charging_time`     |
+| Total operation time| `sensor.indego_total_operation_time`   |
 | Battery percentage | `sensor.indego_battery_percentage`      |
 | Ambient temperature | `sensor.indego_ambient_temperature`    |
 | Battery temperature | `sensor.indego_battery_temperature`    |
