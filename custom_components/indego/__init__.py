@@ -493,7 +493,7 @@ class IndegoHub:
         for entity_key, entity in ENTITY_DEFINITIONS.items():
             if entity[CONF_TYPE] == SENSOR_TYPE:
                 self.entities[entity_key] = IndegoSensor(
-                    f"indego_{self._serial}_{entity_key}",
+                    f"indego_{entity_key}",
                     f"{self._mower_name} {entity[CONF_NAME]}",
                     entity[CONF_ICON],
                     entity[CONF_DEVICE_CLASS],
@@ -510,7 +510,7 @@ class IndegoHub:
 
             elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
                 self.entities[entity_key] = IndegoBinarySensor(
-                    f"indego_{self._serial}_{entity_key}",
+                    f"indego_{entity_key}",
                     f"{self._mower_name} {entity[CONF_NAME]}",
                     entity[CONF_ICON],
                     entity[CONF_DEVICE_CLASS],
@@ -522,7 +522,7 @@ class IndegoHub:
             elif entity[CONF_TYPE] == LAWN_MOWER_TYPE:
                 if self._features[CONF_EXPOSE_INDEGO_AS_MOWER]:
                     self.entities[entity_key] = IndegoLawnMower(
-                        f"indego_{self._serial}",
+                        "indego",
                         self._mower_name,
                         device_info,
                         self
@@ -531,7 +531,7 @@ class IndegoHub:
             elif entity[CONF_TYPE] == VACUUM_TYPE:
                 if self._features[CONF_EXPOSE_INDEGO_AS_VACUUM]:
                     self.entities[entity_key] = IndegoVacuum(
-                        f"indego_{self._serial}",
+                        "indego",
                         self._mower_name,
                         device_info,
                         self
@@ -539,7 +539,7 @@ class IndegoHub:
 
             elif entity[CONF_TYPE] == CAMERA_TYPE:
                 self.entities[entity_key] = IndegoCamera(
-                    f"indego_{self._serial}",
+                    "indego",
                     self._mower_name,
                     device_info,
                     self

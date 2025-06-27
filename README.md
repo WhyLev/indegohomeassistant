@@ -71,21 +71,21 @@ All entities are auto-discovered and appear under *unused entities* after integr
 
 | Function           | Entity                                           |
 | ------------------ | ------------------------------------------------ |
-| Mower state        | `sensor.indego_xxxxxxxx_mower_state`             |
-| Mower state detail | `sensor.indego_xxxxxxxx_mower_state_detail`      |
-| Lawn mowed %       | `sensor.indego_xxxxxxxx_lawn_mowed`              |
-| Total runtime      | `sensor.indego_xxxxxxxx_runtime_total`           |
-| Battery percentage | `sensor.indego_xxxxxxxx_battery_percentage`      |
-| Alerts present     | `binary_sensor.indego_xxxxxxxx_alert`            |
-| Last completed     | `sensor.indego_xxxxxxxx_last_completed`          |
-| Next scheduled mow | `sensor.indego_xxxxxxxx_next_mow`                |
-| Mowing mode        | `sensor.indego_xxxxxxxx_mowing_mode`             |
-| Garden size        | `sensor.indego_xxxxxxxx_garden_size`             |
-| Online state       | `binary_sensor.indego_xxxxxxxx_online`           |
-| Update available   | `binary_sensor.indego_xxxxxxxx_update_available` |
-| Firmware version   | `sensor.indego_xxxxxxxx_firmware_version`        |
-| Serial number      | `sensor.indego_xxxxxxxx_serial_number`           |
-| Camera map         | `camera.indego_xxxxxxxx`                         |
+| Mower state        | `sensor.indego_mower_state`             |
+| Mower state detail | `sensor.indego_mower_state_detail`      |
+| Lawn mowed %       | `sensor.indego_lawn_mowed`              |
+| Total runtime      | `sensor.indego_runtime_total`           |
+| Battery percentage | `sensor.indego_battery_percentage`      |
+| Alerts present     | `binary_sensor.indego_alert`            |
+| Last completed     | `sensor.indego_last_completed`          |
+| Next scheduled mow | `sensor.indego_next_mow`                |
+| Mowing mode        | `sensor.indego_mowing_mode`             |
+| Garden size        | `sensor.indego_garden_size`             |
+| Online state       | `binary_sensor.indego_online`           |
+| Update available   | `binary_sensor.indego_update_available` |
+| Firmware version   | `sensor.indego_firmware_version`        |
+| Serial number      | `sensor.indego_serial_number`           |
+| Camera map         | `camera.indego`                         |
 
 ---
 
