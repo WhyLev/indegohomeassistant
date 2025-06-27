@@ -213,6 +213,14 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: "m²",
         CONF_ATTR: [],
     },
+    ENTITY_FIRMWARE: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "firmware version",
+        CONF_ICON: "mdi:chip",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: None,
+        CONF_ATTR: [],
+    },
     ENTITY_CAMERA: {
         CONF_TYPE: CAMERA_TYPE,
     },
@@ -719,7 +727,7 @@ class IndegoHub:
             _LOGGER.warning("Timeout on update_state() – Mower not available or too slow")
             return
         except Exception as e:
-            _LOGGER.exception("Fehler on update_state() – actual mower_state=%s", self._last_state)
+            _LOGGER.exception("Error on update_state() – actual mower_state=%s", self._last_state)
             return
 
         state = self._indego_client.state
@@ -855,6 +863,11 @@ class IndegoHub:
                 self.entities[
                     ENTITY_MOWING_MODE
                 ].state = self._indego_client.generic_data.mowing_mode_description
+
+            if ENTITY_FIRMWARE in self.entities:
+                self.entities[ENTITY_FIRMWARE].state = (
+                    self._indego_client.generic_data.alm_firmware_version
+                )
 
         return self._indego_client.generic_data
 
