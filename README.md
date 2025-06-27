@@ -21,6 +21,7 @@ This fork combines the solid Bosch Indego integration developed by [sander1988](
 * Alert and error handling with delete/read actions
 * Service commands: mow, pause, return to dock
 * SmartMowing toggling
+* Forecast sensor with rain probability & mow suggestion
 * Mushroom-based Lovelace dashboard with
 
   * Status grid
@@ -79,6 +80,7 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Alerts present     | `binary_sensor.indego_alert`            |
 | Last completed     | `sensor.indego_last_completed`          |
 | Next scheduled mow | `sensor.indego_next_mow`                |
+| Forecast           | `sensor.indego_forecast`                |
 | Mowing mode        | `sensor.indego_mowing_mode`             |
 | Garden size        | `sensor.indego_garden_size`             |
 | Online state       | `binary_sensor.indego_online`           |
@@ -86,6 +88,8 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Firmware version   | `sensor.indego_firmware_version`        |
 | Serial number      | `sensor.indego_serial_number`           |
 | Camera map         | `camera.indego`                         |
+
+`sensor.indego_forecast` exposes rain probability and the next recommended mowing time based on Indego's predictive schedule.
 
 ---
 

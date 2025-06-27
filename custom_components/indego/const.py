@@ -64,6 +64,7 @@ ENTITY_GARDEN_SIZE: Final = "garden_size"
 ENTITY_FIRMWARE: Final = "firmware_version"
 ENTITY_SERIAL_NUMBER: Final = "serial_number"
 ENTITY_CAMERA: Final = "camera"
+ENTITY_FORECAST: Final = "forecast"
 
 HTTP_HEADER_USER_AGENT: Final = "User-Agent"
 HTTP_HEADER_USER_AGENT_DEFAULT: Final = "HA/Indego"
