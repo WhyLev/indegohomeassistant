@@ -103,7 +103,7 @@ class IndegoCamera(IndegoEntity, Camera):
                     last_x, last_y = self._positions[-1]
                     self._path_svg += (
                         f'<line x1="{last_x}" y1="{last_y}" x2="{xpos}" y2="{ypos}" '
-                        f'stroke="#4CAF50" stroke-width="2" stroke-linecap="round" />'
+                        f'stroke="#808080" stroke-width="4" stroke-linecap="round" />'
                     )
                 self._positions.append((xpos, ypos))
 
