@@ -203,6 +203,30 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: None,
         CONF_ATTR: ["rain_probability", "recommended_next_mow"],
     },
+    ENTITY_BATTERY_CYCLES: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "battery cycles",
+        CONF_ICON: "mdi:counter",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: None,
+        CONF_ATTR: [],
+    },
+    ENTITY_AVERAGE_MOW_TIME: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "average mow time",
+        CONF_ICON: "mdi:timer-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "min",
+        CONF_ATTR: [],
+    },
+    ENTITY_WEEKLY_AREA: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "weekly mowed area",
+        CONF_ICON: "mdi:chart-areaspline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "m²",
+        CONF_ATTR: [],
+    },
     ENTITY_MOWING_MODE: {
         CONF_TYPE: SENSOR_TYPE,
         CONF_NAME: "mowing mode",
@@ -517,6 +541,8 @@ class IndegoHub:
         self._last_position = (None, None)
         self._last_state = None
         self._position_interval = position_interval
+        self._weekly_area_entries = []
+        self._last_completed_ts = None
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -866,6 +892,17 @@ class IndegoHub:
             self.entities[ENTITY_TOTAL_MOWING_TIME].state = runtime.total.cut
             self.entities[ENTITY_TOTAL_CHARGING_TIME].state = runtime.total.charge
 
+            self.entities[ENTITY_BATTERY_CYCLES].state = self._indego_client.operating_data.battery.cycles
+
+            if runtime.session.operate:
+                sessions = runtime.total.operate / (runtime.session.operate / 60)
+                if sessions:
+                    avg = runtime.total.cut / sessions
+                    self.entities[ENTITY_AVERAGE_MOW_TIME].state = round(avg * 60, 1)
+            if hasattr(self, "_weekly_area_entries"):
+                total_area = sum(a for t, a in self._weekly_area_entries)
+                self.entities[ENTITY_WEEKLY_AREA].state = total_area
+
     def set_online_state(self, online: bool):
         _LOGGER.debug("Set online state: %s", online)
 
@@ -938,6 +975,17 @@ class IndegoHub:
                 "total_charging_time_h": self._indego_client.state.runtime.total.charge,
             }
         )
+
+        runtime = self._indego_client.state.runtime
+        if runtime.session.operate:
+            sessions = runtime.total.operate / (runtime.session.operate / 60)
+            if sessions:
+                avg = runtime.total.cut / sessions
+                self.entities[ENTITY_AVERAGE_MOW_TIME].state = round(avg * 60, 1)
+
+        if hasattr(self, "_weekly_area_entries"):
+            total_area = sum(a for t, a in self._weekly_area_entries)
+            self.entities[ENTITY_WEEKLY_AREA].state = total_area
 
         if ENTITY_VACUUM in self.entities:
             self.entities[ENTITY_VACUUM].indego_state = self._indego_client.state.state
@@ -1020,6 +1068,14 @@ class IndegoHub:
                     "last_completed_mow": format_indego_date(self._indego_client.last_completed_mow)
                 }
             )
+
+            if self._last_completed_ts != self._indego_client.last_completed_mow:
+                self._last_completed_ts = self._indego_client.last_completed_mow
+                size = self.entities[ENTITY_GARDEN_SIZE].state
+                if size is not None:
+                    self._weekly_area_entries.append((self._last_completed_ts, size))
+                    week_ago = datetime.now() - timedelta(days=7)
+                    self._weekly_area_entries = [ (t,a) for t,a in self._weekly_area_entries if t >= week_ago ]
 
     async def _update_next_mow(self):
         try:
