@@ -195,6 +195,14 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: None,
         CONF_ATTR: [],
     },
+    ENTITY_FORECAST: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "forecast",
+        CONF_ICON: "mdi:weather-partly-cloudy",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: None,
+        CONF_ATTR: ["rain_probability", "recommended_next_mow"],
+    },
     ENTITY_MOWING_MODE: {
         CONF_TYPE: SENSOR_TYPE,
         CONF_NAME: "mowing mode",
@@ -703,6 +711,7 @@ class IndegoHub:
                 self._update_alerts(),
                 self._update_last_completed_mow(),
                 self._update_next_mow(),
+                self._update_forecast(),
             ],
             return_exceptions=True,
         )
@@ -984,6 +993,20 @@ class IndegoHub:
 
             self.entities[ENTITY_LAWN_MOWED].add_attributes(
                 {"next_mow": next_mow}
+            )
+
+    async def _update_forecast(self):
+        await self._indego_client.update_predictive_calendar()
+
+        if self._indego_client.predictive_calendar:
+            forecast = self._indego_client.predictive_calendar[0]
+            self.entities[ENTITY_FORECAST].state = forecast.get("recommendation")
+
+            self.entities[ENTITY_FORECAST].set_attributes(
+                {
+                    "rain_probability": forecast.get("rainChance"),
+                    "recommended_next_mow": forecast.get("nextStart"),
+                }
             )
 
     @property

@@ -13,7 +13,7 @@ This is a custom fork of the original [Indego integration](https://github.com/sa
 * 🔑 Modern OAuth login
 * 🧱 Live map camera (as a `generic camera` entity) (based on [kimzeuner](https://github.com/kimzeuner)'s contributions)
 * 🎨 Beautiful Lovelace Dashboard example (Mushroom Cards)
-* 🌦️ Weather, UV & Rain forecast support
+* 🌦️ Weather, UV & Rain forecast support (via `sensor.indego_forecast`)
 * ✅ Full YAML compatibility
 * 🛠️ Optimized UX and simplified setup
 
