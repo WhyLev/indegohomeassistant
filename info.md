@@ -11,7 +11,7 @@
 This is a custom fork of the original [Indego integration](https://github.com/sander1988/Indego) for Home Assistant – enhanced with:
 
 * 🔑 Modern OAuth login
-* 🧱 Live map camera (as a `generic camera` entity) (based on [kimzeuner](https://github.com/kimzeuner)'s contributions)
+* 🧱 Live map camera and separate progress camera (based on [kimzeuner](https://github.com/kimzeuner)'s contributions)
 * 🎨 Beautiful Lovelace Dashboard example (Mushroom Cards)
 * 🌦️ Weather, UV & Rain forecast support (via `sensor.indego_forecast`)
 * ✅ Full YAML compatibility

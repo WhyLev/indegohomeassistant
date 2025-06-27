@@ -44,7 +44,7 @@ from .vacuum import IndegoVacuum
 from .lawn_mower import IndegoLawnMower
 from .const import *
 from .sensor import IndegoSensor
-from .camera import IndegoCamera
+from .camera import IndegoCamera, IndegoMapCamera
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -278,6 +278,9 @@ ENTITY_DEFINITIONS = {
         CONF_ATTR: [],
     },
     ENTITY_CAMERA: {
+        CONF_TYPE: CAMERA_TYPE,
+    },
+    ENTITY_CAMERA_PROGRESS: {
         CONF_TYPE: CAMERA_TYPE,
     },
 }
@@ -586,12 +589,20 @@ class IndegoHub:
                     )
 
             elif entity[CONF_TYPE] == CAMERA_TYPE:
-                self.entities[entity_key] = IndegoCamera(
-                    "indego",
-                    self._mower_name,
-                    device_info,
-                    self
-                )
+                if entity_key == ENTITY_CAMERA:
+                    self.entities[entity_key] = IndegoMapCamera(
+                        "indego",
+                        self._mower_name,
+                        device_info,
+                        self,
+                    )
+                else:
+                    self.entities[entity_key] = IndegoCamera(
+                        "indego_progress",
+                        self._mower_name,
+                        device_info,
+                        self,
+                    )
 
     async def update_generic_data_and_load_platforms(self, load_platforms):
         """Update the generic mower data, so we can create the HA platforms for the Indego component."""
