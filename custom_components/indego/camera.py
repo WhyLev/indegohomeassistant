@@ -41,9 +41,13 @@ class IndegoCamera(IndegoEntity, Camera):
         self._svg_map = None
         self._attr_is_streaming = False
         self.content_type = "image/svg+xml"
+        self._positions: list[tuple[int, int]] = []
+        self._path_svg = ""
+        self._last_reset = time.time()
 
     async def async_added_to_hass(self) -> None:
         await super().async_added_to_hass()
+        self._last_reset = time.time()
         await asyncio.sleep(3)
         await self.refresh_map("unknown")
 
@@ -83,10 +87,26 @@ class IndegoCamera(IndegoEntity, Camera):
 
             svg_text = svg_text.replace('#FAFAFA', 'transparent').replace('#CCCCCC', 'transparent')
 
+            now = time.time()
+            progress = getattr(self._indego_hub._indego_client.state, "mowed", None)
+            if progress == 100 or now - self._last_reset >= 86400:
+                _LOGGER.debug("Resetting map overlay")
+                self._positions = []
+                self._path_svg = ""
+                self._last_reset = now
+
             xpos = getattr(self._indego_hub._indego_client.state, "svg_xPos", None)
             ypos = getattr(self._indego_hub._indego_client.state, "svg_yPos", None)
 
             if xpos is not None and ypos is not None:
+                if self._positions:
+                    last_x, last_y = self._positions[-1]
+                    self._path_svg += (
+                        f'<line x1="{last_x}" y1="{last_y}" x2="{xpos}" y2="{ypos}" '
+                        f'stroke="#4CAF50" stroke-width="2" stroke-linecap="round" />'
+                    )
+                self._positions.append((xpos, ypos))
+
                 icon_path = "M1 14V5H13C18.5 5 23 9.5 23 15V17H20.83C20.42 18.17 19.31 19 18 19C16.69 19 15.58 18.17 15.17 17H10C9.09 18.21 7.64 19 6 19C3.24 19 1 16.76 1 14M6 11C4.34 11 3 12.34 3 14C3 15.66 4.34 17 6 17C7.66 17 9 15.66 9 14C9 12.34 7.66 11 6 11M15 10V12H20.25C19.92 11.27 19.5 10.6 19 10H15Z"
                 symbol = (
                     f'<path d="{icon_path}" fill="#009688" stroke="#009688" '
@@ -94,7 +114,9 @@ class IndegoCamera(IndegoEntity, Camera):
                 )
 
                 svg_text = svg_text.replace('<path id="mower"', '<!-- removed mower -->')
-                svg_text = svg_text.replace("</svg>", symbol + "</svg>")
+                svg_text = svg_text.replace("</svg>", self._path_svg + symbol + "</svg>")
+            else:
+                svg_text = svg_text.replace("</svg>", self._path_svg + "</svg>")
 
             self._svg_map = svg_text
             self.async_write_ha_state()
