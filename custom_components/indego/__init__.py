@@ -313,7 +313,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         },
         hass,
         entry.options.get(CONF_USER_AGENT),
-        entry.options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL)
+        entry.options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL),
+        entry.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES)
     )
 
     await indego_hub.start_periodic_position_update()
@@ -490,7 +491,17 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 class IndegoHub:
     """Class for the IndegoHub, which controls the sensors and binary sensors."""
 
-    def __init__(self, name: str, session: IndegoOAuth2Session, serial: str, features: dict, hass: HomeAssistant, user_agent: Optional[str] = None, position_interval: int = DEFAULT_POSITION_UPDATE_INTERVAL):
+    def __init__(
+        self,
+        name: str,
+        session: IndegoOAuth2Session,
+        serial: str,
+        features: dict,
+        hass: HomeAssistant,
+        user_agent: Optional[str] = None,
+        position_interval: int = DEFAULT_POSITION_UPDATE_INTERVAL,
+        adaptive_updates: bool = DEFAULT_ADAPTIVE_POSITION_UPDATES,
+    ):
         """Initialize the IndegoHub.
 
         Args:
@@ -517,6 +528,8 @@ class IndegoHub:
         self._last_position = (None, None)
         self._last_state = None
         self._position_interval = position_interval
+        self._current_position_interval = position_interval
+        self._adaptive_updates = adaptive_updates
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -795,6 +808,11 @@ class IndegoHub:
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
             interval = self._position_interval
+
+        if self._unsub_map_timer:
+            self._unsub_map_timer()
+
+        self._current_position_interval = interval
         self._unsub_map_timer = async_track_time_interval(
             self._hass, self._check_position_and_state, timedelta(seconds=interval)
         )
@@ -818,6 +836,11 @@ class IndegoHub:
         xpos = getattr(state, "svg_xPos", None)
         ypos = getattr(state, "svg_yPos", None)
         self._last_state = mower_state
+
+        if self._adaptive_updates:
+            desired_interval = 60 if mower_state == "docked" else self._position_interval
+            if desired_interval != self._current_position_interval:
+                await self.start_periodic_position_update(desired_interval)
 
         if mower_state == "docked":
             _LOGGER.debug("Mower is docked - no position updates")
