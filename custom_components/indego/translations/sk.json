@@ -2,7 +2,7 @@
     "config": {
         "abort": {
             "already_configured": "Táto kosačka Bosch Indego je už nakonfigurovaná!",
-            "connection_error": "Pripojenie k Bosch Indego API zlyhalo! Použite stránku so známymi problémami (https://github.com/sander1988/Indego?tab=readme-ov-file#known-issues) pre možné riešenia.",
+            "connection_error": "Pripojenie k Bosch Indego API zlyhalo! Použite stránku so známymi problémami (https://github.com/WhyLev/indegohomeassistant/issues) pre možné riešenia.",
             "no_mowers_found": "V tomto účte Bosch Indego sa nenašli žiadne kosačky!"
         },
         "step": {

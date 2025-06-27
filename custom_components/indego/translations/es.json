@@ -1,10 +1,10 @@
 {
     "config": {
         "abort": {
-            "already_configured": "This Bosch Indego mower has already been configured!",
-            "connection_error": "The connection to the Bosch Indego API failed! Please use the known issues page (https://github.com/WhyLev/indegohomeassistant/issues) for possible solutions.",
-            "no_mowers_found": "No mowers found in this Bosch Indego account!",
-            "reauth_successful": "Re-authentication was successful. Access to the Bosch API has been restored."
+            "already_configured": "¡Este cortacésped Bosch Indego ya está configurado!",
+            "connection_error": "¡La conexión con la API de Bosch Indego falló! Consulta la página de problemas conocidos (https://github.com/WhyLev/indegohomeassistant/issues) para posibles soluciones.",
+            "no_mowers_found": "¡No se encontraron cortacéspedes en esta cuenta de Bosch Indego!",
+            "reauth_successful": "La reautenticación fue exitosa. Se restableció el acceso a la API de Bosch."
         },
         "step": {
             "advanced": {

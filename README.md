@@ -126,7 +126,7 @@ Required HACS Frontend Cards:
 
 ## 🌿 Supported Mower Models
 
-See full list [here](https://github.com/sander1988/Indego#supported-models). All Indego models are supported.
+All Indego models are supported. See [the GitHub repository](https://github.com/WhyLev/indegohomeassistant) for details.
 
 ---
 
