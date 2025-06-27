@@ -503,7 +503,10 @@ class IndegoHub:
                     translation_key=entity[CONF_TRANSLATION_KEY] if CONF_TRANSLATION_KEY in entity else None,
                 )
                 if entity_key == ENTITY_SERIAL_NUMBER:
-                    self.entities[entity_key].state = self._serial
+                    # Avoid scheduling a state update before the entity is
+                    # added to Home Assistant by setting the protected
+                    # attribute directly.
+                    self.entities[entity_key]._state = self._serial
 
             elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
                 self.entities[entity_key] = IndegoBinarySensor(
