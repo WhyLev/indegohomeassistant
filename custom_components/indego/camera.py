@@ -28,7 +28,7 @@ async def async_setup_entry(
         [
             entity
             for entity in hass.data[DOMAIN][config_entry.entry_id].entities.values()
-            if isinstance(entity, IndegoCamera)
+            if isinstance(entity, (IndegoCamera, IndegoMapCamera))
         ]
     )
 
@@ -117,6 +117,26 @@ class IndegoCamera(IndegoEntity, Camera):
                 svg_text = svg_text.replace("</svg>", self._path_svg + symbol + "</svg>")
             else:
                 svg_text = svg_text.replace("</svg>", self._path_svg + "</svg>")
+
+            self._svg_map = svg_text
+            self.async_write_ha_state()
+
+        except Exception as e:
+            _LOGGER.error("Camera: Error during map update: %s", e)
+
+
+class IndegoMapCamera(IndegoCamera):
+    async def refresh_map(self, mower_state: str):
+        try:
+            svg_path = self._indego_hub.map_path()
+            if not os.path.exists(svg_path):
+                _LOGGER.warning("Camera: SVG-File %s not present – no update", svg_path)
+                return
+
+            async with aiofiles.open(svg_path, "r") as f:
+                svg_text = await f.read()
+
+            svg_text = svg_text.replace('#FAFAFA', 'transparent').replace('#CCCCCC', 'transparent')
 
             self._svg_map = svg_text
             self.async_write_ha_state()
