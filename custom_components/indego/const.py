@@ -25,8 +25,10 @@ CONF_SEND_COMMAND: Final = "command"
 CONF_SMARTMOWING: Final = "enable"
 CONF_POLLING: Final = "polling"
 CONF_POSITION_UPDATE_INTERVAL: Final = "position_update_interval"
+CONF_ADAPTIVE_POSITION_UPDATES: Final = "adaptive_position_updates"
 
 DEFAULT_POSITION_UPDATE_INTERVAL: Final = 10
+DEFAULT_ADAPTIVE_POSITION_UPDATES: Final = True
 
 DEFAULT_NAME: Final = "Indego"
 DEFAULT_NAME_COMMANDS: Final = None
