@@ -78,3 +78,6 @@ HTTP_HEADER_USER_AGENT_DEFAULTS: Final = [
     "HomeAssistant/Indego",
     "HA/Indego"
 ]
+
+# Width of progress lines drawn on the map camera (in pixels)
+MAP_PROGRESS_LINE_WIDTH: Final = 6
