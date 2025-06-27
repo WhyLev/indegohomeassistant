@@ -741,14 +741,16 @@ class IndegoHub:
         )
 
         next_refresh = 600
-        index = 0
-        for res in results:
+        for index, res in enumerate(results):
             if res and isinstance(res, BaseException):
                 try:
                     raise res
                 except Exception as exc:
-                    _LOGGER.warning("Error %s for index %i while performing 10m update", str(exc), index)
-            index += 1
+                    _LOGGER.warning(
+                        "Error %s for index %i while performing 10m update",
+                        str(exc),
+                        index,
+                    )
 
         self._refresh_10m_remover = async_call_later(
             self._hass, next_refresh, self.refresh_10m
@@ -1009,7 +1011,11 @@ class IndegoHub:
             )
 
     async def _update_next_mow(self):
-        await self._indego_client.update_next_mow()
+        try:
+            await self._indego_client.update_next_mow()
+        except Exception as exc:
+            _LOGGER.warning("Failed to update next mow: %s", exc)
+            return
 
         if self._indego_client.next_mow:
             self.entities[ENTITY_NEXT_MOW].state = self._indego_client.next_mow.isoformat()

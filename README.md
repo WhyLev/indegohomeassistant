@@ -94,8 +94,6 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Serial number      | `sensor.indego_serial_number`           |
 | Camera map         | `camera.indego` (shows progress)        |
 
-`sensor.indego_forecast` exposes rain probability and the next recommended mowing time based on Indego's predictive schedule.
-
 ---
 
 ## 🚜 Services
