@@ -1,12 +1,12 @@
 {
   "domain": "indego",
-  "name": "Bosch Indego Mower",
+  "name": "Bosch Indego Mower HomeAssistant",
   "config_flow": true,
   "documentation": "https://github.com/WhyLev/indegohomeassistant",
   "dependencies": ["application_credentials"],
-  "codeowners": ["@jm-73", "@eavanvalkenburg", "@sander1988"],
+  "codeowners": ["@WhyLev"],
   "requirements": ["pyIndego==3.2.2", "svgutils==0.3.4"],
   "iot_class": "cloud_push",
-  "version": "5.7.8",
+  "version": "1.1",
   "loggers": ["custom_components.indego", "pyIndego"]
 }
