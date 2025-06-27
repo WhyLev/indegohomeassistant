@@ -17,7 +17,7 @@ This fork combines the solid Bosch Indego integration developed by [sander1988](
 
 * OAuth2 login via Bosch SingleKey ID
 * Real-time state, mowing progress, battery status
-* Camera map view (rendered map)
+* Camera map view with optional animated progress overlay (resets after 24h or on completion)
 * Alert and error handling with delete/read actions
 * Service commands: mow, pause, return to dock
 * SmartMowing toggling
@@ -87,7 +87,8 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Update available   | `binary_sensor.indego_update_available` |
 | Firmware version   | `sensor.indego_firmware_version`        |
 | Serial number      | `sensor.indego_serial_number`           |
-| Camera map         | `camera.indego`                         |
+| Camera map         | `camera.indego_map`                     |
+| Progress map       | `camera.indego` (shows progress)        |
 
 ---
 

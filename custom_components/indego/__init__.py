@@ -44,7 +44,7 @@ from .vacuum import IndegoVacuum
 from .lawn_mower import IndegoLawnMower
 from .const import *
 from .sensor import IndegoSensor
-from .camera import IndegoCamera
+from .camera import IndegoMapCamera, IndegoProgressCamera
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -246,6 +246,9 @@ ENTITY_DEFINITIONS = {
         CONF_ATTR: [],
     },
     ENTITY_CAMERA: {
+        CONF_TYPE: CAMERA_TYPE,
+    },
+    ENTITY_CAMERA_PROGRESS: {
         CONF_TYPE: CAMERA_TYPE,
     },
 }
@@ -554,12 +557,20 @@ class IndegoHub:
                     )
 
             elif entity[CONF_TYPE] == CAMERA_TYPE:
-                self.entities[entity_key] = IndegoCamera(
-                    "indego",
-                    self._mower_name,
-                    device_info,
-                    self
-                )
+                if entity_key == ENTITY_CAMERA:
+                    self.entities[entity_key] = IndegoMapCamera(
+                        "indego_map",
+                        f"{self._mower_name} map",
+                        device_info,
+                        self,
+                    )
+                else:
+                    self.entities[entity_key] = IndegoProgressCamera(
+                        "indego",
+                        self._mower_name,
+                        device_info,
+                        self,
+                    )
 
     async def update_generic_data_and_load_platforms(self, load_platforms):
         """Update the generic mower data, so we can create the HA platforms for the Indego component."""
@@ -708,14 +719,16 @@ class IndegoHub:
         )
 
         next_refresh = 600
-        index = 0
-        for res in results:
+        for index, res in enumerate(results):
             if res and isinstance(res, BaseException):
                 try:
                     raise res
                 except Exception as exc:
-                    _LOGGER.warning("Error %s for index %i while performing 10m update", str(exc), index)
-            index += 1
+                    _LOGGER.warning(
+                        "Error %s for index %i while performing 10m update",
+                        str(exc),
+                        index,
+                    )
 
         self._refresh_10m_remover = async_call_later(
             self._hass, next_refresh, self.refresh_10m
@@ -971,7 +984,11 @@ class IndegoHub:
             )
 
     async def _update_next_mow(self):
-        await self._indego_client.update_next_mow()
+        try:
+            await self._indego_client.update_next_mow()
+        except Exception as exc:
+            _LOGGER.warning("Failed to update next mow: %s", exc)
+            return
 
         if self._indego_client.next_mow:
             self.entities[ENTITY_NEXT_MOW].state = self._indego_client.next_mow.isoformat()
