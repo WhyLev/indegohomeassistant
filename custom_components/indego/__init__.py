@@ -737,7 +737,7 @@ class IndegoHub:
             if self._update_fail_count is None:
                 self._update_fail_count = 1
             _LOGGER.debug("Delaying next status update with %i seconds due to previous failure...", STATUS_UPDATE_FAILURE_DELAY_TIME[self._update_fail_count])
-            when = datetime.now() + timedelta(seconds=STATUS_UPDATE_FAILURE_DELAY_TIME[self._update_fail_count])
+            when = utcnow() + timedelta(seconds=STATUS_UPDATE_FAILURE_DELAY_TIME[self._update_fail_count])
             self._update_fail_count = min(self._update_fail_count + 1, len(STATUS_UPDATE_FAILURE_DELAY_TIME) - 1)
             self._unsub_refresh_state = async_track_point_in_time(self._hass, self._create_refresh_state_task, when)
             return
@@ -1096,8 +1096,13 @@ class IndegoHub:
                 self._last_completed_ts = self._indego_client.last_completed_mow
                 size = self.entities[ENTITY_GARDEN_SIZE].state
                 if size is not None:
-                    self._weekly_area_entries.append((self._last_completed_ts, size))
-                    week_ago = datetime.now() - timedelta(days=7)
+                    try:
+                        size_val = float(size)
+                    except (TypeError, ValueError):
+                        size_val = None
+                    if size_val is not None:
+                        self._weekly_area_entries.append((self._last_completed_ts, size_val))
+                    week_ago = utcnow() - timedelta(days=7)
                     self._weekly_area_entries = [ (t,a) for t,a in self._weekly_area_entries if t >= week_ago ]
 
     async def _update_next_mow(self):
@@ -1123,16 +1128,28 @@ class IndegoHub:
     async def _update_forecast(self):
         await self._indego_client.update_predictive_calendar()
 
-        if self._indego_client.predictive_calendar:
-            forecast = self._indego_client.predictive_calendar[0]
-            self.entities[ENTITY_FORECAST].state = forecast.get("recommendation")
+        pc = self._indego_client.predictive_calendar
+        if pc:
+            forecast = None
+            if isinstance(pc, list):
+                forecast = pc[0]
+            elif hasattr(pc, "calendar"):
+                cal = getattr(pc, "calendar")
+                if isinstance(cal, list) and cal:
+                    forecast = cal[0]
+            elif hasattr(pc, "slots"):
+                slots = getattr(pc, "slots")
+                if isinstance(slots, list) and slots:
+                    forecast = slots[0]
 
-            self.entities[ENTITY_FORECAST].set_attributes(
-                {
-                    "rain_probability": forecast.get("rainChance"),
-                    "recommended_next_mow": forecast.get("nextStart"),
-                }
-            )
+            if forecast:
+                self.entities[ENTITY_FORECAST].state = forecast.get("recommendation")
+                self.entities[ENTITY_FORECAST].set_attributes(
+                    {
+                        "rain_probability": forecast.get("rainChance"),
+                        "recommended_next_mow": forecast.get("nextStart"),
+                    }
+                )
 
     @property
     def serial(self) -> str:
