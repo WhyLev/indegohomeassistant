@@ -11,7 +11,8 @@
                 "data": {
                     "user_agent": "User-Agent",
                     "expose_mower": "Indego Mähroboter als Mower Entität in HomeAssistant anlegen",
-                    "expose_vacuum": "Indego Mähroboter als Vacuum Entität in HomeAssistant anlegen"
+                    "expose_vacuum": "Indego Mähroboter als Vacuum Entität in HomeAssistant anlegen",
+                    "position_update_interval": "Positionsaktualisierungsintervall (Sekunden)"
                 },
                 "description": "Erweiterte Einstellung des Bosch Indego Component."
             },
@@ -37,7 +38,8 @@
                     "user_agent": "User-Agent",
                     "expose_mower": "Indego Mähroboter als Mower Entität in HomeAssistant anlegen",
                     "expose_vacuum": "Indego Mähroboter als Vacuum Entität in HomeAssistant anlegen",
-                    "show_all_alerts": "Zeige den kompletten Alarm Verlauf in HomeAssistant. Dies wird für die meisten Nutzer nicht empfohlen, da es signifikanten Einfluss auf die Größe der HomeAssistant Datenbank haben kann."
+                    "show_all_alerts": "Zeige den kompletten Alarm Verlauf in HomeAssistant. Dies wird für die meisten Nutzer nicht empfohlen, da es signifikanten Einfluss auf die Größe der HomeAssistant Datenbank haben kann.",
+                    "position_update_interval": "Positionsaktualisierungsintervall (Sekunden)"
                 }
             }
         }
