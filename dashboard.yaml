@@ -50,6 +50,15 @@ cards:
         entity: binary_sensor.indego_alert
         name: Warnung
         icon_color: red
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_total_operation_time
+        name: Betriebszeit gesamt
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_total_mowing_time
+        name: Mähzeit gesamt
+      - type: custom:mushroom-entity-card
+        entity: sensor.indego_total_charging_time
+        name: Ladezeit gesamt
       - type: custom:mushroom-template-card
         primary: Alle Warnungen löschen
         icon: mdi:bell-remove-outline

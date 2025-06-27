@@ -195,6 +195,14 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: None,
         CONF_ATTR: [],
     },
+    ENTITY_FORECAST: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "forecast",
+        CONF_ICON: "mdi:weather-partly-cloudy",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: None,
+        CONF_ATTR: ["rain_probability", "recommended_next_mow"],
+    },
     ENTITY_MOWING_MODE: {
         CONF_TYPE: SENSOR_TYPE,
         CONF_NAME: "mowing mode",
@@ -214,6 +222,30 @@ ENTITY_DEFINITIONS = {
             "total_charging_time_h",
             "total_operation_time_h",
         ],
+    },
+    ENTITY_TOTAL_MOWING_TIME: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "total mowing time",
+        CONF_ICON: "mdi:clock-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "h",
+        CONF_ATTR: [],
+    },
+    ENTITY_TOTAL_CHARGING_TIME: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "total charging time",
+        CONF_ICON: "mdi:clock-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "h",
+        CONF_ATTR: [],
+    },
+    ENTITY_TOTAL_OPERATION_TIME: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "total operation time",
+        CONF_ICON: "mdi:clock-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: "h",
+        CONF_ATTR: [],
     },
     ENTITY_VACUUM: {
         CONF_TYPE: VACUUM_TYPE,
@@ -703,6 +735,7 @@ class IndegoHub:
                 self._update_alerts(),
                 self._update_last_completed_mow(),
                 self._update_next_mow(),
+                self._update_forecast(),
             ],
             return_exceptions=True,
         )
@@ -816,6 +849,11 @@ class IndegoHub:
                     f"ambient_temp_{UnitOfTemperature.CELSIUS}": self._indego_client.operating_data.battery.ambient_temp,
                 }
             )
+
+            runtime = self._indego_client.operating_data.runtime
+            self.entities[ENTITY_TOTAL_OPERATION_TIME].state = runtime.total.operate
+            self.entities[ENTITY_TOTAL_MOWING_TIME].state = runtime.total.cut
+            self.entities[ENTITY_TOTAL_CHARGING_TIME].state = runtime.total.charge
 
     def set_online_state(self, online: bool):
         _LOGGER.debug("Set online state: %s", online)
@@ -990,6 +1028,20 @@ class IndegoHub:
 
             self.entities[ENTITY_LAWN_MOWED].add_attributes(
                 {"next_mow": next_mow}
+            )
+
+    async def _update_forecast(self):
+        await self._indego_client.update_predictive_calendar()
+
+        if self._indego_client.predictive_calendar:
+            forecast = self._indego_client.predictive_calendar[0]
+            self.entities[ENTITY_FORECAST].state = forecast.get("recommendation")
+
+            self.entities[ENTITY_FORECAST].set_attributes(
+                {
+                    "rain_probability": forecast.get("rainChance"),
+                    "recommended_next_mow": forecast.get("nextStart"),
+                }
             )
 
     @property

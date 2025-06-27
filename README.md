@@ -21,6 +21,7 @@ This fork combines the solid Bosch Indego integration developed by [sander1988](
 * Alert and error handling with delete/read actions
 * Service commands: mow, pause, return to dock
 * SmartMowing toggling
+* Forecast sensor with rain probability & mow suggestion
 * Mushroom-based Lovelace dashboard with
 
   * Status grid
@@ -75,12 +76,16 @@ All entities are auto-discovered and appear under *unused entities* after integr
 | Mower state detail | `sensor.indego_mower_state_detail`      |
 | Lawn mowed %       | `sensor.indego_lawn_mowed`              |
 | Total runtime      | `sensor.indego_runtime_total`           |
+| Total mowing time  | `sensor.indego_total_mowing_time`       |
+| Total charging time| `sensor.indego_total_charging_time`     |
+| Total operation time| `sensor.indego_total_operation_time`   |
 | Battery percentage | `sensor.indego_battery_percentage`      |
 | Ambient temperature | `sensor.indego_ambient_temperature`    |
 | Battery temperature | `sensor.indego_battery_temperature`    |
 | Alerts present     | `binary_sensor.indego_alert`            |
 | Last completed     | `sensor.indego_last_completed`          |
 | Next scheduled mow | `sensor.indego_next_mow`                |
+| Forecast           | `sensor.indego_forecast`                |
 | Mowing mode        | `sensor.indego_mowing_mode`             |
 | Garden size        | `sensor.indego_garden_size`             |
 | Online state       | `binary_sensor.indego_online`           |
