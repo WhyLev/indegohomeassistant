@@ -23,7 +23,9 @@ from .const import (
     CONF_SHOW_ALL_ALERTS,
     CONF_USER_AGENT,
     CONF_POSITION_UPDATE_INTERVAL,
+    CONF_ADAPTIVE_POSITION_UPDATES,
     DEFAULT_POSITION_UPDATE_INTERVAL,
+    DEFAULT_ADAPTIVE_POSITION_UPDATES,
     OAUTH2_CLIENT_ID,
     HTTP_HEADER_USER_AGENT,
     HTTP_HEADER_USER_AGENT_DEFAULT,
@@ -85,6 +87,10 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
                     CONF_POSITION_UPDATE_INTERVAL,
                     default=self.options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL),
                 ): int,
+                vol.Optional(
+                    CONF_ADAPTIVE_POSITION_UPDATES,
+                    default=self.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES),
+                ): bool,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
@@ -175,6 +181,7 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
             self._options[CONF_EXPOSE_INDEGO_AS_MOWER] = user_input[CONF_EXPOSE_INDEGO_AS_MOWER]
             self._options[CONF_EXPOSE_INDEGO_AS_VACUUM] = user_input[CONF_EXPOSE_INDEGO_AS_VACUUM]
             self._options[CONF_POSITION_UPDATE_INTERVAL] = user_input[CONF_POSITION_UPDATE_INTERVAL]
+            self._options[CONF_ADAPTIVE_POSITION_UPDATES] = user_input[CONF_ADAPTIVE_POSITION_UPDATES]
 
             try:
                 self._mower_serials = await api_client.get_mowers()
@@ -223,6 +230,10 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
                     CONF_POSITION_UPDATE_INTERVAL,
                     default=(self._options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL))
                 ): int,
+                vol.Optional(
+                    CONF_ADAPTIVE_POSITION_UPDATES,
+                    default=(self._options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES))
+                ): bool,
             }
         )
         return self.async_show_form(step_id="advanced", data_schema=schema)
