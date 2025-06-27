@@ -148,6 +148,22 @@ ENTITY_DEFINITIONS = {
             f"ambient_temp_{UnitOfTemperature.CELSIUS}",
         ],
     },
+    ENTITY_AMBIENT_TEMP: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "ambient temperature",
+        CONF_ICON: "mdi:thermometer",
+        CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE,
+        CONF_UNIT_OF_MEASUREMENT: UnitOfTemperature.CELSIUS,
+        CONF_ATTR: [],
+    },
+    ENTITY_BATTERY_TEMP: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "battery temperature",
+        CONF_ICON: "mdi:thermometer",
+        CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE,
+        CONF_UNIT_OF_MEASUREMENT: UnitOfTemperature.CELSIUS,
+        CONF_ATTR: [],
+    },
     ENTITY_LAWN_MOWED: {
         CONF_TYPE: SENSOR_TYPE,
         CONF_NAME: "lawn mowed",
@@ -780,6 +796,13 @@ class IndegoHub:
                 self.entities[ENTITY_VACUUM].battery_level = self._indego_client.operating_data.battery.percent_adjusted
 
             self.entities[ENTITY_GARDEN_SIZE].state = self._indego_client.operating_data.garden.size
+
+            self.entities[ENTITY_AMBIENT_TEMP].state = (
+                self._indego_client.operating_data.battery.ambient_temp
+            )
+            self.entities[ENTITY_BATTERY_TEMP].state = (
+                self._indego_client.operating_data.battery.battery_temp
+            )
 
             self.entities[ENTITY_BATTERY].add_attributes(
                 {
