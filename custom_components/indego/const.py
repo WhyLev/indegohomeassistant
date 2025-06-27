@@ -42,7 +42,6 @@ SENSOR_TYPE: Final = "sensor"
 BINARY_SENSOR_TYPE: Final = "binary_sensor"
 VACUUM_TYPE: Final = "vacuum"
 LAWN_MOWER_TYPE: Final = "lawn_mower"
-CAMERA_TYPE: Final = "camera"
 INDEGO_PLATFORMS: Final = [SENSOR_TYPE, BINARY_SENSOR_TYPE, VACUUM_TYPE, LAWN_MOWER_TYPE, CAMERA_TYPE]
 
 ENTITY_ONLINE: Final = "online"
@@ -59,6 +58,7 @@ ENTITY_RUNTIME: Final = "runtime_total"
 ENTITY_VACUUM: Final = "vacuum"
 ENTITY_LAWN_MOWER: Final = "lawn_mower"
 ENTITY_GARDEN_SIZE: Final = "garden_size"
+ENTITY_FIRMWARE: Final = "firmware_version"
 ENTITY_CAMERA: Final = "camera"
 
 HTTP_HEADER_USER_AGENT: Final = "User-Agent"

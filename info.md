@@ -6,7 +6,7 @@
 
 # Bosch Indego Mower – Lovelace Enhanced Edition
 
-![Screenshot](https://raw.githubusercontent.com/dein-github-user/dein-repo-name/main/doc/0-Sensors_3.png)
+![Screenshot](https://raw.githubusercontent.com/WhyLev/indegohomeassistant/main/doc/0-Sensors_3.png)
 
 This is a custom fork of the original [Indego integration](https://github.com/sander1988/Indego) for Home Assistant – enhanced with:
 
@@ -22,6 +22,7 @@ This is a custom fork of the original [Indego integration](https://github.com/sa
 ### 🧹 Installation
 
 > Don’t forget to install the Chrome extension (see [README](https://github.com/WhyLev/indegohomeassistant/blob/main/README.md)) to finish the login process.
+> Alternatively, run `auth_proxy.py` to handle the OAuth callback without Chrome.
 
 ---
 
