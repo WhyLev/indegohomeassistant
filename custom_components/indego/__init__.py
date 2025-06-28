@@ -835,7 +835,7 @@ class IndegoHub:
         self._refresh_24h_remover = async_call_later(self._hass, 86400, self.refresh_24h)
 
     def map_path(self):
-        return f"/config/www/indego_map_{self._serial}.svg"
+        return self._hass.config.path("www", f"indego_map_{self._serial}.svg")
 
     async def download_and_store_map(self):
         try:
