@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 import aiofiles
+import os
 from datetime import datetime, timedelta
 from aiohttp.client_exceptions import ClientResponseError
 
@@ -683,6 +684,10 @@ class IndegoHub:
         try:
             _LOGGER.debug("Refreshing initial operating data.")
             await self._update_operating_data()
+
+            if not os.path.exists(self.map_path()):
+                _LOGGER.debug("Map file missing, downloading")
+                await self.download_and_store_map()
 
         except Exception as exc:
             _LOGGER.warning("Error %s for while performing initial update", str(exc))
