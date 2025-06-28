@@ -906,9 +906,16 @@ class IndegoHub:
                         await entity.refresh_map(mower_state)
     
     async def _update_operating_data(self):
-        await self._indego_client.update_operating_data()
+        try:
+            await self._indego_client.update_operating_data()
+        except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
+            _LOGGER.warning("Timeout while updating operating data: %s", exc)
+            return
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Failed to update operating data: %s", exc)
+            return
 
-        _LOGGER.debug(f"Updating operating data")
+        _LOGGER.debug("Updating operating data")
         if self._indego_client.operating_data:
             self.entities[ENTITY_BATTERY].state = self._indego_client.operating_data.battery.percent_adjusted
 
