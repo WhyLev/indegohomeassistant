@@ -870,6 +870,12 @@ class IndegoHub:
             _LOGGER.warning(
                 "Map download for %s completed but returned no data", self._serial
             )
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Map download for %s failed: %s", self._serial, exc)
+            return
+
+        if not svg_bytes:
+            _LOGGER.warning("Map download for %s returned no data", self._serial)
             return
 
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -883,6 +889,7 @@ class IndegoHub:
                 self._serial,
                 path,
                 exc,
+                "Error during saving the map [%s] to %s: %s", self._serial, path, exc
             )
 
     async def start_periodic_position_update(self, interval: int | None = None):
