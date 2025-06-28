@@ -736,7 +736,11 @@ class IndegoHub:
 
         except Exception as exc:
             update_failed = True
-            _LOGGER.warning("Mower state update failed, reason: %s", str(exc))
+            _LOGGER.warning(
+                "Mower state update failed for %s, reason: %s",
+                self._serial,
+                str(exc),
+            )
             self.set_online_state(False)
 
         if self._shutdown:
@@ -759,7 +763,11 @@ class IndegoHub:
                     await self._update_operating_data()
 
                 except Exception as exc:
-                    _LOGGER.warning("Mower operating data update failed, reason: %s", str(exc))
+                    _LOGGER.warning(
+                        "Mower operating data update failed for %s, reason: %s",
+                        self._serial,
+                        str(exc),
+                    )
 
             if self._indego_client.state.error != self._latest_alert:
                 self._latest_alert = self._indego_client.state.error
@@ -768,7 +776,11 @@ class IndegoHub:
                     await self._update_alerts()
 
                 except Exception as exc:
-                    _LOGGER.warning("Mower alerts update failed, reason: %s", str(exc))
+                    _LOGGER.warning(
+                        "Mower alerts update failed for %s, reason: %s",
+                        self._serial,
+                        str(exc),
+                    )
 
         await self._create_refresh_state_task()
 
@@ -806,9 +818,10 @@ class IndegoHub:
                     raise res
                 except Exception as exc:
                     _LOGGER.warning(
-                        "Error %s for index %i while performing 10m update",
+                        "Error %s for index %i while performing 10m update for %s",
                         str(exc),
                         index,
+                        self._serial,
                     )
 
         self._refresh_10m_remover = async_call_later(
@@ -823,7 +836,9 @@ class IndegoHub:
             await self._update_updates_available()
 
         except Exception as exc:
-            _LOGGER.warning("Error %s while performing 24h update", str(exc))
+            _LOGGER.warning(
+                "Error %s while performing 24h update for %s", str(exc), self._serial
+            )
 
         self._refresh_24h_remover = async_call_later(self._hass, 86400, self.refresh_24h)
 
@@ -836,6 +851,25 @@ class IndegoHub:
         path = self.map_path()
         try:
             svg_bytes = await self._indego_client.download_map(self._serial)
+        except asyncio.TimeoutError as exc:
+            _LOGGER.warning(
+                "Map download timed out for %s. The mower might be unreachable: %s",
+                self._serial,
+                exc,
+            )
+            return
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning(
+                "Unexpected error while downloading map for %s: %s",
+                self._serial,
+                exc,
+            )
+            return
+
+        if not svg_bytes:
+            _LOGGER.warning(
+                "Map download for %s completed but returned no data", self._serial
+            )
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning("Map download for %s failed: %s", self._serial, exc)
             return
@@ -851,6 +885,10 @@ class IndegoHub:
             _LOGGER.info("Map saved in %s", path)
         except Exception as exc:  # noqa: BLE001
             _LOGGER.warning(
+                "Could not write map for mower %s to %s: %s",
+                self._serial,
+                path,
+                exc,
                 "Error during saving the map [%s] to %s: %s", self._serial, path, exc
             )
 
@@ -873,10 +911,17 @@ class IndegoHub:
                 timeout=self._state_update_timeout,
             )
         except asyncio.TimeoutError:
-            _LOGGER.warning("Timeout on update_state() – Mower not available or too slow")
+            _LOGGER.warning(
+                "Timeout on update_state() for %s – mower not available or too slow",
+                self._serial,
+            )
             return
         except Exception as e:
-            _LOGGER.exception("Error on update_state() – actual mower_state=%s", self._last_state)
+            _LOGGER.exception(
+                "Error on update_state() for %s – actual mower_state=%s",
+                self._serial,
+                self._last_state,
+            )
             return
 
         state = self._indego_client.state
@@ -910,10 +955,18 @@ class IndegoHub:
         try:
             await self._indego_client.update_operating_data()
         except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
-            _LOGGER.warning("Timeout while updating operating data: %s", exc)
+            _LOGGER.warning(
+                "Timeout while updating operating data for %s. This usually means the mower did not respond in time: %s",
+                self._serial,
+                exc,
+            )
             return
         except Exception as exc:  # noqa: BLE001
-            _LOGGER.warning("Failed to update operating data: %s", exc)
+            _LOGGER.warning(
+                "Failed to update operating data for %s: %s",
+                self._serial,
+                exc,
+            )
             return
 
         _LOGGER.debug("Updating operating data")
@@ -1143,7 +1196,9 @@ class IndegoHub:
         try:
             await self._indego_client.update_next_mow()
         except Exception as exc:
-            _LOGGER.warning("Failed to update next mow: %s", exc)
+            _LOGGER.warning(
+                "Failed to update next mow for %s: %s", self._serial, exc
+            )
             return
 
         if self._indego_client.next_mow:
