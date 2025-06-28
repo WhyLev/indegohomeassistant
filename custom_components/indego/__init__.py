@@ -684,13 +684,15 @@ class IndegoHub:
         try:
             _LOGGER.debug("Refreshing initial operating data.")
             await self._update_operating_data()
+        except Exception:
+            _LOGGER.exception("Initial call to _update_operating_data failed")
 
+        try:
             if not os.path.exists(self.map_path()):
                 _LOGGER.debug("Map file missing, downloading")
                 await self.download_and_store_map()
-
-        except Exception as exc:
-            _LOGGER.warning("Error %s for while performing initial update", str(exc))
+        except Exception:
+            _LOGGER.exception("Initial map download failed")
 
     async def async_shutdown(self, _=None):
         """Remove all future updates, cancel tasks and close the client."""
