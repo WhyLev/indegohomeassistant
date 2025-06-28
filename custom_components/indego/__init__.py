@@ -867,7 +867,10 @@ class IndegoHub:
 
     async def _check_position_and_state(self, now):
         try:
-            await self._indego_client.update_state(force=True, timeout=self._state_update_timeout)
+            await asyncio.wait_for(
+                self._indego_client.update_state(force=True),
+                timeout=self._state_update_timeout,
+            )
         except asyncio.TimeoutError:
             _LOGGER.warning("Timeout on update_state() – Mower not available or too slow")
             return
