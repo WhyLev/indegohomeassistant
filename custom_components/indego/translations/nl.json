@@ -11,7 +11,9 @@
                 "data": {
                     "user_agent": "User-Agent",
                     "expose_mower": "Voeg de Indego robotmaaier toe als grasmaaier entiteit aan HomeAssistant",
-                    "expose_vacuum": "Voeg de Indego robotmaaier toe als stofzuiger entiteit aan HomeAssistant"
+                    "expose_vacuum": "Voeg de Indego robotmaaier toe als stofzuiger entiteit aan HomeAssistant",
+                    "progress_line_width": "Progress line width (px)",
+                    "progress_line_color": "Progress line color"
                 },
                 "description": "Geavanceerde instellingen van het Bosch Indego component."
             },
@@ -37,7 +39,9 @@
                   "user_agent": "User-Agent",
                   "expose_mower": "Voeg de Indego robotmaaier toe als grasmaaier entiteit aan HomeAssistant",
                   "expose_vacuum": "Voeg de Indego robotmaaier toe als stofzuiger entiteit aan HomeAssistant",
-                  "show_all_alerts": "Toon de volledige melding/waarschuwing geschiedenis in HomeAssistant. Dit wordt niet aangeraden voor de meeste gebruikers, het heeft mogelijk een significante impact op de HomeAssistant database!"
+                  "show_all_alerts": "Toon de volledige melding/waarschuwing geschiedenis in HomeAssistant. Dit wordt niet aangeraden voor de meeste gebruikers, het heeft mogelijk een significante impact op de HomeAssistant database!",
+                  "progress_line_width": "Progress line width (px)",
+                  "progress_line_color": "Progress line color"
               }
           }
       }

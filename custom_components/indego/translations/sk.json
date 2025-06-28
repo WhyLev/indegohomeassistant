@@ -10,7 +10,9 @@
                 "data": {
                     "user_agent": "User-Agent",
                     "expose_mower": "Odhaľte kosačku Indego ako entitu kosačky v aplikácii HomeAssistant",
-                    "expose_vacuum": "Odhaľte kosačku Indego ako vákuovú entitu v aplikácii HomeAssistant"
+                    "expose_vacuum": "Odhaľte kosačku Indego ako vákuovú entitu v aplikácii HomeAssistant",
+                    "progress_line_width": "Progress line width (px)",
+                    "progress_line_color": "Progress line color"
                 },
                 "description": "Rozšírené nastavenia komponentu Bosch Indego."
             },
@@ -32,7 +34,9 @@
                   "user_agent": "User-Agent",
                   "expose_mower": "Odhaľte kosačku Indego ako entitu kosačky v aplikácii HomeAssistant",
                   "expose_vacuum": "Odhaľte kosačku Indego ako vákuovú entitu v aplikácii HomeAssistant",
-                  "show_all_alerts": "Zobrazte celú históriu upozornení v aplikácii HomeAssistant. Toto sa neodporúča väčšine používateľov, môže to mať významný vplyv na veľkosť databázy HomeAssistant!"
+                  "show_all_alerts": "Zobrazte celú históriu upozornení v aplikácii HomeAssistant. Toto sa neodporúča väčšine používateľov, môže to mať významný vplyv na veľkosť databázy HomeAssistant!",
+                  "progress_line_width": "Progress line width (px)",
+                  "progress_line_color": "Progress line color"
               }
           }
       }

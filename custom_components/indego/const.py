@@ -88,3 +88,9 @@ HTTP_HEADER_USER_AGENT_DEFAULTS: Final = [
 
 # Width of progress lines drawn on the map camera (in pixels)
 MAP_PROGRESS_LINE_WIDTH: Final = 6
+# Default color of progress lines drawn on the map camera
+MAP_PROGRESS_LINE_COLOR: Final = "#808080"
+
+# Configuration options for map progress path appearance
+CONF_PROGRESS_LINE_WIDTH: Final = "progress_line_width"
+CONF_PROGRESS_LINE_COLOR: Final = "progress_line_color"

@@ -340,6 +340,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.options.get(CONF_USER_AGENT),
         entry.options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL),
         entry.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES),
+        entry.options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH),
+        entry.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
         entry.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT)
     )
 
@@ -527,6 +529,8 @@ class IndegoHub:
         user_agent: Optional[str] = None,
         position_interval: int = DEFAULT_POSITION_UPDATE_INTERVAL,
         adaptive_updates: bool = DEFAULT_ADAPTIVE_POSITION_UPDATES,
+        progress_line_width: int = MAP_PROGRESS_LINE_WIDTH,
+        progress_line_color: str = MAP_PROGRESS_LINE_COLOR,
         state_update_timeout: int = DEFAULT_STATE_UPDATE_TIMEOUT,
     ):
         """Initialize the IndegoHub.
@@ -557,6 +561,8 @@ class IndegoHub:
         self._position_interval = position_interval
         self._current_position_interval = position_interval
         self._adaptive_updates = adaptive_updates
+        self._progress_line_width = progress_line_width
+        self._progress_line_color = progress_line_color
         self._state_update_timeout = state_update_timeout
         self._weekly_area_entries = []
         self._last_completed_ts = None
@@ -1174,3 +1180,11 @@ class IndegoHub:
     @property
     def client(self) -> IndegoAsyncClient:
         return self._indego_client
+
+    @property
+    def progress_line_width(self) -> int:
+        return self._progress_line_width
+
+    @property
+    def progress_line_color(self) -> str:
+        return self._progress_line_color

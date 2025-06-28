@@ -19,7 +19,7 @@ This fork combines the solid Bosch Indego integration developed by [sander1988](
 * OAuth2 login via Bosch SingleKey ID
 * Real-time state, mowing progress, battery status
 * Static map camera plus animated progress camera (resets after 24h or on completion)
-* Progress path line width set by `MAP_PROGRESS_LINE_WIDTH` (default 6px)
+* Progress path appearance configurable (width & color)
 * Alert and error handling with delete/read actions
 * Service commands: mow, pause, return to dock
 * SmartMowing toggling
