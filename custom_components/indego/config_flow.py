@@ -30,6 +30,10 @@ from .const import (
     DEFAULT_ADAPTIVE_POSITION_UPDATES,
     MAP_PROGRESS_LINE_WIDTH,
     MAP_PROGRESS_LINE_COLOR,
+    CONF_STATE_UPDATE_TIMEOUT,
+    DEFAULT_POSITION_UPDATE_INTERVAL,
+    DEFAULT_ADAPTIVE_POSITION_UPDATES,
+    DEFAULT_STATE_UPDATE_TIMEOUT,
     OAUTH2_CLIENT_ID,
     HTTP_HEADER_USER_AGENT,
     HTTP_HEADER_USER_AGENT_DEFAULT,
@@ -103,6 +107,9 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
                     CONF_PROGRESS_LINE_COLOR,
                     default=self.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
                 ): str,
+                    CONF_STATE_UPDATE_TIMEOUT,
+                    default=self.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT),
+                ): int,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
@@ -196,6 +203,7 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
             self._options[CONF_ADAPTIVE_POSITION_UPDATES] = user_input[CONF_ADAPTIVE_POSITION_UPDATES]
             self._options[CONF_PROGRESS_LINE_WIDTH] = user_input[CONF_PROGRESS_LINE_WIDTH]
             self._options[CONF_PROGRESS_LINE_COLOR] = user_input[CONF_PROGRESS_LINE_COLOR]
+            self._options[CONF_STATE_UPDATE_TIMEOUT] = user_input[CONF_STATE_UPDATE_TIMEOUT]
 
             try:
                 self._mower_serials = await api_client.get_mowers()
@@ -256,6 +264,9 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
                     CONF_PROGRESS_LINE_COLOR,
                     default=(self._options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR))
                 ): str,
+                    CONF_STATE_UPDATE_TIMEOUT,
+                    default=(self._options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT))
+                ): int,
             }
         )
         return self.async_show_form(step_id="advanced", data_schema=schema)

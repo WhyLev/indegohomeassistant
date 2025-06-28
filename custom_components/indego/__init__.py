@@ -342,6 +342,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES),
         entry.options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH),
         entry.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
+        entry.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT)
     )
 
     await indego_hub.start_periodic_position_update()
@@ -530,6 +531,7 @@ class IndegoHub:
         adaptive_updates: bool = DEFAULT_ADAPTIVE_POSITION_UPDATES,
         progress_line_width: int = MAP_PROGRESS_LINE_WIDTH,
         progress_line_color: str = MAP_PROGRESS_LINE_COLOR,
+        state_update_timeout: int = DEFAULT_STATE_UPDATE_TIMEOUT,
     ):
         """Initialize the IndegoHub.
 
@@ -561,6 +563,7 @@ class IndegoHub:
         self._adaptive_updates = adaptive_updates
         self._progress_line_width = progress_line_width
         self._progress_line_color = progress_line_color
+        self._state_update_timeout = state_update_timeout
         self._weekly_area_entries = []
         self._last_completed_ts = None
 
@@ -690,13 +693,15 @@ class IndegoHub:
         try:
             _LOGGER.debug("Refreshing initial operating data.")
             await self._update_operating_data()
+        except Exception:
+            _LOGGER.exception("Initial call to _update_operating_data failed")
 
+        try:
             if not os.path.exists(self.map_path()):
                 _LOGGER.debug("Map file missing, downloading")
                 await self.download_and_store_map()
-
-        except Exception as exc:
-            _LOGGER.warning("Error %s for while performing initial update", str(exc))
+        except Exception:
+            _LOGGER.exception("Initial map download failed")
 
     async def async_shutdown(self, _=None):
         """Remove all future updates, cancel tasks and close the client."""
@@ -836,11 +841,17 @@ class IndegoHub:
         try:
             svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
             if svg_bytes:
-                async with aiofiles.open(self.map_path(), "wb") as f:
+                path = self._hass.config.path(
+                    "www", f"indego_map_{self._serial}.svg"
+                )
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                async with aiofiles.open(path, "wb") as f:
                     await f.write(svg_bytes)
-                _LOGGER.info("Map saved in %s", self.map_path())
+                _LOGGER.info("Map saved in %s", path)
         except Exception as e:
-            _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
+            _LOGGER.warning(
+                "Error during saving the map [%s]: %s", self._serial, e
+            )
 
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
@@ -856,7 +867,7 @@ class IndegoHub:
 
     async def _check_position_and_state(self, now):
         try:
-            await self._indego_client.update_state(force=True)
+            await self._indego_client.update_state(force=True, timeout=self._state_update_timeout)
         except asyncio.TimeoutError:
             _LOGGER.warning("Timeout on update_state() – Mower not available or too slow")
             return
@@ -1143,12 +1154,22 @@ class IndegoHub:
         if self._indego_client.predictive_calendar:
             calendar = self._indego_client.predictive_calendar
             forecast = calendar[0] if isinstance(calendar, list) else calendar
-            self.entities[ENTITY_FORECAST].state = forecast.get("recommendation")
+
+            if isinstance(forecast, dict):
+                recommendation = forecast.get("recommendation")
+                rain_chance = forecast.get("rainChance")
+                next_start = forecast.get("nextStart")
+            else:
+                recommendation = getattr(forecast, "recommendation", None)
+                rain_chance = getattr(forecast, "rainChance", None)
+                next_start = getattr(forecast, "nextStart", None)
+
+            self.entities[ENTITY_FORECAST].state = recommendation
 
             self.entities[ENTITY_FORECAST].set_attributes(
                 {
-                    "rain_probability": forecast.get("rainChance"),
-                    "recommended_next_mow": forecast.get("nextStart"),
+                    "rain_probability": rain_chance,
+                    "recommended_next_mow": next_start,
                 }
             )
 
