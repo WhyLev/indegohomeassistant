@@ -2,9 +2,9 @@ command:
   description: Send commands to the mower. Allowed commands are mow, returnToDock and pause.
   fields:
     mower_serial:
-      description: Mower serial. Only needed when you have configured multiple mowers.
+      description: Serial number of the mower for which the map should be downloaded.
       example: '"YOUR_SERIALNUMBER"'
-      required: false
+      required: true
     command:
       description: Command for the mower.
       example: "mow"
@@ -13,9 +13,9 @@ smartmowing:
   description: Enable or Disable SmartMowing. Allowed commands are true or false.
   fields:
     mower_serial:
-      description: Mower serial. Only needed when you have configured multiple mowers.
+      description: Serial number of the mower for which the map should be downloaded.
       example: '"YOUR_SERIALNUMBER"'
-      required: false
+      required: true
     enable: 
       description: Enable SmartMowing.
       example: "true"
@@ -55,9 +55,11 @@ read_alert_all:
       example: '"YOUR_SERIALNUMBER"'
       required: false
 download_map:
-  description: Download the current map from the Bosch API and store it in www/indego_map_base.svg.
+  description: >-
+    Download the current map from the Bosch API and save it to
+    `www/indego_map_SERIALNUMBER.svg`.
   fields:
     mower_serial:
-      description: Mower serial. Only needed when you have configured multiple mowers.
+      description: Serial number of the mower for which the map should be downloaded.
       example: '"YOUR_SERIALNUMBER"'
-      required: false
+      required: true
