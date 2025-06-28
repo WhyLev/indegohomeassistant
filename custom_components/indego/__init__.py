@@ -847,22 +847,21 @@ class IndegoHub:
 
     async def download_and_store_map(self) -> None:
         """Download the current map from the mower and save it locally."""
-    async def download_and_store_map(self):
         try:
             svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
             if svg_bytes:
                 async with aiofiles.open(self.map_path(), "wb") as f:
                     await f.write(svg_bytes)
                 _LOGGER.info("Map saved in %s", self.map_path())
+        except ClientResponseError as exc:
+            _LOGGER.warning(
+                "Map download for %s failed: HTTP %s - %s",
+                self._serial,
+                exc.status,
+                exc.message,
+            )
         except Exception as e:  # noqa: BLE001
             _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
-        except Exception as e:
-            _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
-
-    async def start_periodic_position_update(self):
-        self._unsub_map_timer = async_track_time_interval(
-            self._hass, self._check_position_and_state, timedelta(seconds=60)
-        )
 
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
