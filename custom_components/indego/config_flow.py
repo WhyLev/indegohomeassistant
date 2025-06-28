@@ -31,8 +31,6 @@ from .const import (
     MAP_PROGRESS_LINE_WIDTH,
     MAP_PROGRESS_LINE_COLOR,
     CONF_STATE_UPDATE_TIMEOUT,
-    DEFAULT_POSITION_UPDATE_INTERVAL,
-    DEFAULT_ADAPTIVE_POSITION_UPDATES,
     DEFAULT_STATE_UPDATE_TIMEOUT,
     OAUTH2_CLIENT_ID,
     HTTP_HEADER_USER_AGENT,
@@ -107,6 +105,7 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
                     CONF_PROGRESS_LINE_COLOR,
                     default=self.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
                 ): str,
+                vol.Optional(
                     CONF_STATE_UPDATE_TIMEOUT,
                     default=self.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT),
                 ): int,
@@ -264,6 +263,7 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
                     CONF_PROGRESS_LINE_COLOR,
                     default=(self._options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR))
                 ): str,
+                vol.Optional(
                     CONF_STATE_UPDATE_TIMEOUT,
                     default=(self._options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT))
                 ): int,
