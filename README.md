@@ -147,6 +147,12 @@ You can call the following services:
 | `indego.delete_alert_all` | Delete all alerts                      |
 | `indego.download_map`     | Save the mower map to `www/indego_map_SERIALNUMBER.svg` |
 
+The map file is saved inside Home Assistant's configuration directory. On
+standard installations this is accessible at `/config/www` from within the
+container. If you run Home Assistant in Docker, this folder maps to the path
+where your configuration volume is mounted (for example
+`volumes/homeassistant/config/www`).
+
 ---
 
 ## 📊 Dashboard

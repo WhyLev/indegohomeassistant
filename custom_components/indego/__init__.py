@@ -832,19 +832,19 @@ class IndegoHub:
 
     async def download_and_store_map(self):
         """Download the current map and store it as an SVG file."""
+        path = self.map_path()
         try:
             svg_bytes = await self._indego_client.download_map(self._serial)
-            if svg_bytes:
-                path = self._hass.config.path(
-                    "www", f"indego_map_{self._serial}.svg"
-                )
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                async with aiofiles.open(path, "wb") as f:
-                    await f.write(svg_bytes)
-                _LOGGER.info("Map saved in %s", path)
+            if not svg_bytes:
+                _LOGGER.warning("Map download for %s returned no data", self._serial)
+                return
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            async with aiofiles.open(path, "wb") as f:
+                await f.write(svg_bytes)
+            _LOGGER.info("Map saved in %s", path)
         except Exception as e:
             _LOGGER.warning(
-                "Error during saving the map [%s]: %s", self._serial, e
+                "Error during saving the map [%s] to %s: %s", self._serial, path, e
             )
 
     async def start_periodic_position_update(self, interval: int | None = None):
