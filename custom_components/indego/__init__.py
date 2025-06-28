@@ -827,24 +827,31 @@ class IndegoHub:
 
         self._refresh_24h_remover = async_call_later(self._hass, 86400, self.refresh_24h)
 
-    def map_path(self):
+    def map_path(self) -> str:
+        """Return the absolute path where the map file should be stored."""
         return self._hass.config.path("www", f"indego_map_{self._serial}.svg")
 
-    async def download_and_store_map(self):
-        """Download the current map and store it as an SVG file."""
+    async def download_and_store_map(self) -> None:
+        """Download the current map from the mower and save it locally."""
         path = self.map_path()
         try:
             svg_bytes = await self._indego_client.download_map(self._serial)
-            if not svg_bytes:
-                _LOGGER.warning("Map download for %s returned no data", self._serial)
-                return
-            os.makedirs(os.path.dirname(path), exist_ok=True)
+        except Exception as exc:  # noqa: BLE001
+            _LOGGER.warning("Map download for %s failed: %s", self._serial, exc)
+            return
+
+        if not svg_bytes:
+            _LOGGER.warning("Map download for %s returned no data", self._serial)
+            return
+
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        try:
             async with aiofiles.open(path, "wb") as f:
                 await f.write(svg_bytes)
             _LOGGER.info("Map saved in %s", path)
-        except Exception as e:
+        except Exception as exc:  # noqa: BLE001
             _LOGGER.warning(
-                "Error during saving the map [%s] to %s: %s", self._serial, path, e
+                "Error during saving the map [%s] to %s: %s", self._serial, path, exc
             )
 
     async def start_periodic_position_update(self, interval: int | None = None):
