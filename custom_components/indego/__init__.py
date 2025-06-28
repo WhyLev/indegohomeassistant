@@ -923,7 +923,7 @@ class IndegoHub:
                     avg = runtime.total.cut / sessions
                     self.entities[ENTITY_AVERAGE_MOW_TIME].state = round(avg * 60, 1)
             if hasattr(self, "_weekly_area_entries"):
-                total_area = sum(a for t, a in self._weekly_area_entries)
+                total_area = sum(float(a) for t, a in self._weekly_area_entries)
                 self.entities[ENTITY_WEEKLY_AREA].state = total_area
 
     def set_online_state(self, online: bool):
@@ -1007,7 +1007,7 @@ class IndegoHub:
                 self.entities[ENTITY_AVERAGE_MOW_TIME].state = round(avg * 60, 1)
 
         if hasattr(self, "_weekly_area_entries"):
-            total_area = sum(a for t, a in self._weekly_area_entries)
+            total_area = sum(float(a) for t, a in self._weekly_area_entries)
             self.entities[ENTITY_WEEKLY_AREA].state = total_area
 
         if ENTITY_VACUUM in self.entities:
@@ -1096,9 +1096,15 @@ class IndegoHub:
                 self._last_completed_ts = self._indego_client.last_completed_mow
                 size = self.entities[ENTITY_GARDEN_SIZE].state
                 if size is not None:
-                    self._weekly_area_entries.append((self._last_completed_ts, size))
-                    week_ago = datetime.now() - timedelta(days=7)
-                    self._weekly_area_entries = [ (t,a) for t,a in self._weekly_area_entries if t >= week_ago ]
+                    try:
+                        size_val = float(size)
+                    except (TypeError, ValueError):
+                        _LOGGER.debug("Invalid garden size value: %s", size)
+                        size_val = None
+                    if size_val is not None:
+                        self._weekly_area_entries.append((self._last_completed_ts, size_val))
+                        week_ago = utcnow() - timedelta(days=7)
+                        self._weekly_area_entries = [ (t, a) for t, a in self._weekly_area_entries if t >= week_ago ]
 
     async def _update_next_mow(self):
         try:
@@ -1124,7 +1130,8 @@ class IndegoHub:
         await self._indego_client.update_predictive_calendar()
 
         if self._indego_client.predictive_calendar:
-            forecast = self._indego_client.predictive_calendar[0]
+            calendar = self._indego_client.predictive_calendar
+            forecast = calendar[0] if isinstance(calendar, list) else calendar
             self.entities[ENTITY_FORECAST].state = forecast.get("recommendation")
 
             self.entities[ENTITY_FORECAST].set_attributes(
