@@ -1137,12 +1137,22 @@ class IndegoHub:
         if self._indego_client.predictive_calendar:
             calendar = self._indego_client.predictive_calendar
             forecast = calendar[0] if isinstance(calendar, list) else calendar
-            self.entities[ENTITY_FORECAST].state = forecast.get("recommendation")
+
+            if isinstance(forecast, dict):
+                recommendation = forecast.get("recommendation")
+                rain_chance = forecast.get("rainChance")
+                next_start = forecast.get("nextStart")
+            else:
+                recommendation = getattr(forecast, "recommendation", None)
+                rain_chance = getattr(forecast, "rainChance", None)
+                next_start = getattr(forecast, "nextStart", None)
+
+            self.entities[ENTITY_FORECAST].state = recommendation
 
             self.entities[ENTITY_FORECAST].set_attributes(
                 {
-                    "rain_probability": forecast.get("rainChance"),
-                    "recommended_next_mow": forecast.get("nextStart"),
+                    "rain_probability": rain_chance,
+                    "recommended_next_mow": next_start,
                 }
             )
 
