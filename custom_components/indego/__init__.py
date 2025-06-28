@@ -842,42 +842,23 @@ class IndegoHub:
 
         self._refresh_24h_remover = async_call_later(self._hass, 86400, self.refresh_24h)
 
-    def map_path(self) -> str:
-        """Return the absolute path where the map file should be stored."""
-        return self._hass.config.path("www", f"indego_map_{self._serial}.svg")
+    def map_path(self):
+        return f"/config/www/indego_map_{self._serial}.svg"
 
-    async def download_and_store_map(self) -> None:
-        """Download the current map from the mower and save it locally."""
-        path = self.map_path()
+    async def download_and_store_map(self):
         try:
-            svg_bytes = await self._indego_client.download_map(self._serial)
-        except asyncio.TimeoutError as exc:
-            _LOGGER.warning(
-                "Map download timed out for %s. The mower might be unreachable: %s",
-                self._serial,
-                exc,
-            )
-            return
-        except Exception as exc:  # noqa: BLE001
-            _LOGGER.warning("Map download for %s failed: %s", self._serial, exc)
-            return
+            svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
+            if svg_bytes:
+                async with aiofiles.open(self.map_path(), "wb") as f:
+                    await f.write(svg_bytes)
+                _LOGGER.info("Map saved in %s", self.map_path())
+        except Exception as e:
+            _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
 
-        if not svg_bytes:
-            _LOGGER.warning("Map download for %s returned no data", self._serial)
-            return
-
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        try:
-            async with aiofiles.open(path, "wb") as f:
-                await f.write(svg_bytes)
-            _LOGGER.info("Map saved in %s", path)
-        except Exception as exc:  # noqa: BLE001
-            _LOGGER.warning(
-                "Could not write map for mower %s to %s: %s",
-                self._serial,
-                path,
-                exc,
-            )
+    async def start_periodic_position_update(self):
+        self._unsub_map_timer = async_track_time_interval(
+            self._hass, self._check_position_and_state, timedelta(seconds=60)
+        )
 
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
