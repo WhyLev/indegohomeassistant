@@ -832,11 +832,17 @@ class IndegoHub:
         try:
             svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
             if svg_bytes:
-                async with aiofiles.open(self.map_path(), "wb") as f:
+                path = self._hass.config.path(
+                    "www", f"indego_map_{self._serial}.svg"
+                )
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                async with aiofiles.open(path, "wb") as f:
                     await f.write(svg_bytes)
-                _LOGGER.info("Map saved in %s", self.map_path())
+                _LOGGER.info("Map saved in %s", path)
         except Exception as e:
-            _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
+            _LOGGER.warning(
+                "Error during saving the map [%s]: %s", self._serial, e
+            )
 
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
