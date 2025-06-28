@@ -78,7 +78,7 @@ SERVICE_SCHEMA_READ_ALERT_ALL = vol.Schema({
 })
 
 SERVICE_SCHEMA_DOWNLOAD_MAP = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string
+    vol.Required(CONF_MOWER_SERIAL): cv.string
 })
 
 
@@ -838,8 +838,9 @@ class IndegoHub:
         return self._hass.config.path("www", f"indego_map_{self._serial}.svg")
 
     async def download_and_store_map(self):
+        """Download the current map and store it as an SVG file."""
         try:
-            svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
+            svg_bytes = await self._indego_client.download_map(self._serial)
             if svg_bytes:
                 path = self._hass.config.path(
                     "www", f"indego_map_{self._serial}.svg"
