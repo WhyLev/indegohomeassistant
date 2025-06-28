@@ -11,7 +11,9 @@
                 "data": {
                     "user_agent": "User-Agent",
                     "expose_mower": "Exposer la tondeuse Indego comme une entité tondeuse dans HomeAssistant",
-                    "expose_vacuum": "Exposer la tondeuse Indego comme une entité aspirateur dans HomeAssistant"
+                    "expose_vacuum": "Exposer la tondeuse Indego comme une entité aspirateur dans HomeAssistant",
+                    "progress_line_width": "Progress line width (px)",
+                    "progress_line_color": "Progress line color"
                 },
                 "description": "Réglages avancés du composant Bosch Indego. Peuvent être laissés inchangés pour la plupart des utilisateurs."
             },
@@ -37,8 +39,10 @@
                   "user_agent": "User-Agent",
                   "expose_mower": "Exposer la tondeuse Indego comme une entité tondeuse dans HomeAssistant",
                   "expose_vacuum": "Exposer la tondeuse Indego comme une entité aspirateur dans HomeAssistant",
-                  "show_all_alerts": "Montrer l'historique complet des alertes dans HomeAssistant. Non recommandé pour la plupart des utilisateurs, l'impact sur la taille de la base de données HomeAssistant peut être assez important!"
-              }
+                    "show_all_alerts": "Montrer l'historique complet des alertes dans HomeAssistant. Non recommandé pour la plupart des utilisateurs, l'impact sur la taille de la base de données HomeAssistant peut être assez important!",
+                    "progress_line_width": "Progress line width (px)",
+                    "progress_line_color": "Progress line color"
+                }
           }
       }
     },

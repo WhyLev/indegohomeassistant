@@ -24,8 +24,12 @@ from .const import (
     CONF_USER_AGENT,
     CONF_POSITION_UPDATE_INTERVAL,
     CONF_ADAPTIVE_POSITION_UPDATES,
+    CONF_PROGRESS_LINE_WIDTH,
+    CONF_PROGRESS_LINE_COLOR,
     DEFAULT_POSITION_UPDATE_INTERVAL,
     DEFAULT_ADAPTIVE_POSITION_UPDATES,
+    MAP_PROGRESS_LINE_WIDTH,
+    MAP_PROGRESS_LINE_COLOR,
     OAUTH2_CLIENT_ID,
     HTTP_HEADER_USER_AGENT,
     HTTP_HEADER_USER_AGENT_DEFAULT,
@@ -91,6 +95,14 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
                     CONF_ADAPTIVE_POSITION_UPDATES,
                     default=self.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES),
                 ): bool,
+                vol.Optional(
+                    CONF_PROGRESS_LINE_WIDTH,
+                    default=self.options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH),
+                ): int,
+                vol.Optional(
+                    CONF_PROGRESS_LINE_COLOR,
+                    default=self.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
+                ): str,
             }
         )
         return self.async_show_form(step_id="init", data_schema=schema)
@@ -182,6 +194,8 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
             self._options[CONF_EXPOSE_INDEGO_AS_VACUUM] = user_input[CONF_EXPOSE_INDEGO_AS_VACUUM]
             self._options[CONF_POSITION_UPDATE_INTERVAL] = user_input[CONF_POSITION_UPDATE_INTERVAL]
             self._options[CONF_ADAPTIVE_POSITION_UPDATES] = user_input[CONF_ADAPTIVE_POSITION_UPDATES]
+            self._options[CONF_PROGRESS_LINE_WIDTH] = user_input[CONF_PROGRESS_LINE_WIDTH]
+            self._options[CONF_PROGRESS_LINE_COLOR] = user_input[CONF_PROGRESS_LINE_COLOR]
 
             try:
                 self._mower_serials = await api_client.get_mowers()
@@ -234,6 +248,14 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
                     CONF_ADAPTIVE_POSITION_UPDATES,
                     default=(self._options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES))
                 ): bool,
+                vol.Optional(
+                    CONF_PROGRESS_LINE_WIDTH,
+                    default=(self._options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH))
+                ): int,
+                vol.Optional(
+                    CONF_PROGRESS_LINE_COLOR,
+                    default=(self._options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR))
+                ): str,
             }
         )
         return self.async_show_form(step_id="advanced", data_schema=schema)
