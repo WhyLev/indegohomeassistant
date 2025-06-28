@@ -845,6 +845,8 @@ class IndegoHub:
     def map_path(self):
         return f"/config/www/indego_map_{self._serial}.svg"
 
+    async def download_and_store_map(self) -> None:
+        """Download the current map from the mower and save it locally."""
     async def download_and_store_map(self):
         try:
             svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
@@ -852,6 +854,8 @@ class IndegoHub:
                 async with aiofiles.open(self.map_path(), "wb") as f:
                     await f.write(svg_bytes)
                 _LOGGER.info("Map saved in %s", self.map_path())
+        except Exception as e:  # noqa: BLE001
+            _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
         except Exception as e:
             _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
 
