@@ -16,6 +16,7 @@ This is a custom fork of the original [Indego integration](https://github.com/sa
 * 🌦️ Weather, UV & Rain forecast support (via `sensor.indego_forecast`)
 * ✅ Full YAML compatibility
 * 🛠️ Optimized UX and simplified setup
+* 📥 Map automatically downloaded on restart when missing
 
 ---
 

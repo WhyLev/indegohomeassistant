@@ -24,6 +24,7 @@ This fork combines the solid Bosch Indego integration developed by [sander1988](
 * Service commands: mow, pause, return to dock
 * SmartMowing toggling
 * Map position updates every 10 seconds by default (configurable)
+* Map file is automatically downloaded on Home Assistant restart if missing
 * Forecast sensor with rain probability & mow suggestion
 * Mushroom-based Lovelace dashboard with
 
