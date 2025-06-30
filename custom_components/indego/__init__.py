@@ -916,7 +916,7 @@ class IndegoHub:
 
         if xpos is not None and ypos is not None:
             if (xpos, ypos) != self._last_position:
-                _LOGGER.info("Position geändert: x=%s, y=%s", xpos, ypos)
+                _LOGGER.info("Position changed: x=%s, y=%s", xpos, ypos)
                 self._last_position = (xpos, ypos)
                 for entity in self.entities.values():
                     if hasattr(entity, "refresh_map"):
