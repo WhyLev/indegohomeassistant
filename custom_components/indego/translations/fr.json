@@ -41,7 +41,8 @@
                   "expose_vacuum": "Exposer la tondeuse Indego comme une entité aspirateur dans HomeAssistant",
                     "show_all_alerts": "Montrer l'historique complet des alertes dans HomeAssistant. Non recommandé pour la plupart des utilisateurs, l'impact sur la taille de la base de données HomeAssistant peut être assez important!",
                     "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color"
+                    "progress_line_color": "Progress line color",
+                    "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)"
                 }
           }
       }
