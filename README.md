@@ -198,6 +198,40 @@ When the mower state shows as `unknown`, the mower did not respond before the ti
 
 ---
 
+## 🌐 Supported Languages
+
+Translations are provided for these languages:
+
+* Arabic
+* Bengali
+* Chinese
+* Dutch
+* English
+* French
+* German
+* Hindi
+* Indonesian
+* Italian
+* Japanese
+* Korean
+* Polish
+* Portuguese
+* Punjabi
+* Russian
+* Slovak
+* Spanish
+* Swedish
+* Tamil
+* Telugu
+* Thai
+* Turkish
+* Urdu
+* Vietnamese
+
+Contributions for additional translations are welcome!
+
+---
+
 ## 🙋 Support
 
 For issues, open a [GitHub Issue](https://github.com/WhyLev/indegohomeassistant/issues) or join the [Discord](https://discord.gg/aD33GsP).
