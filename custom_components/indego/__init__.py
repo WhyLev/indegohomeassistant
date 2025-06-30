@@ -752,11 +752,17 @@ class IndegoHub:
             self._update_fail_count = 0
             mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
             if mower_state == "unknown":
-                _LOGGER.warning(
-                    "Received unknown state for %s, last success at %s – refreshing",
-                    self._serial,
-                    self._last_state_ts,
-                )
+                if self._last_state_ts is None:
+                    _LOGGER.debug(
+                        "Received unknown state for %s on initial update – refreshing",
+                        self._serial,
+                    )
+                else:
+                    _LOGGER.warning(
+                        "Received unknown state for %s, last success at %s – refreshing",
+                        self._serial,
+                        self._last_state_ts,
+                    )
                 try:
                     await self._update_state(longpoll=False)
                 except Exception as exc:  # noqa: BLE001
@@ -983,11 +989,17 @@ class IndegoHub:
 
         mower_state = getattr(state, "mower_state", "unknown")
         if mower_state == "unknown":
-            _LOGGER.warning(
-                "Received unknown state for %s, last success at %s – refreshing",
-                self._serial,
-                self._last_state_ts,
-            )
+            if self._last_state_ts is None:
+                _LOGGER.debug(
+                    "Received unknown state for %s on initial update – refreshing",
+                    self._serial,
+                )
+            else:
+                _LOGGER.warning(
+                    "Received unknown state for %s, last success at %s – refreshing",
+                    self._serial,
+                    self._last_state_ts,
+                )
             try:
                 await self._update_state(longpoll=False)
             except Exception as exc:  # noqa: BLE001
