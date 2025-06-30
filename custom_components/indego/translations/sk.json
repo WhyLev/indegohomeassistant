@@ -36,7 +36,8 @@
                   "expose_vacuum": "Odhaľte kosačku Indego ako vákuovú entitu v aplikácii HomeAssistant",
                   "show_all_alerts": "Zobrazte celú históriu upozornení v aplikácii HomeAssistant. Toto sa neodporúča väčšine používateľov, môže to mať významný vplyv na veľkosť databázy HomeAssistant!",
                   "progress_line_width": "Progress line width (px)",
-                  "progress_line_color": "Progress line color"
+                  "progress_line_color": "Progress line color",
+                  "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)"
               }
           }
       }

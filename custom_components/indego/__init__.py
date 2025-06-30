@@ -575,6 +575,7 @@ class IndegoHub:
         self._state_update_timeout = state_update_timeout
         self._weekly_area_entries = []
         self._last_completed_ts = None
+        self._last_error = {}
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -808,6 +809,15 @@ class IndegoHub:
         self._unsub_refresh_state()
         self._unsub_refresh_state = None
 
+    def _warn_once(self, msg: str, *args) -> None:
+        """Log a warning only if more than 60 seconds passed since last time."""
+        key = msg % args if args else msg
+        now = time.time()
+        last = self._last_error.get(key)
+        if last is None or now - last > 60:
+            _LOGGER.warning(msg, *args)
+            self._last_error[key] = now
+
     async def refresh_10m(self, _=None):
         """Refresh Indego sensors every 10m."""
         _LOGGER.debug("Refreshing 10m.")
@@ -925,10 +935,28 @@ class IndegoHub:
                     self._last_state,
                 )
                 return
+        try:
+            await asyncio.wait_for(
+                self._indego_client.update_state(force=True),
+                timeout=self._state_update_timeout,
+            )
+        except asyncio.TimeoutError:
+            self._warn_once(
+                "Timeout on update_state() for %s – mower not available or too slow",
+                self._serial,
+            )
+            return
+        except Exception as e:
+            _LOGGER.exception(
+                "Error on update_state() for %s – actual mower_state=%s",
+                self._serial,
+                self._last_state,
+            )
+            return
 
         state = self._indego_client.state
         if not state:
-            _LOGGER.warning("Received invalid state from mower")
+            self._warn_once("Received invalid state from mower")
             return
 
         mower_state = getattr(state, "mower_state", "unknown")
@@ -947,7 +975,7 @@ class IndegoHub:
 
         if xpos is not None and ypos is not None:
             if (xpos, ypos) != self._last_position:
-                _LOGGER.info("Position geändert: x=%s, y=%s", xpos, ypos)
+                _LOGGER.info("Position changed: x=%s, y=%s", xpos, ypos)
                 self._last_position = (xpos, ypos)
                 for entity in self.entities.values():
                     if hasattr(entity, "refresh_map"):
@@ -1046,6 +1074,11 @@ class IndegoHub:
                         raise
                     continue
                 raise
+        try:
+            await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+        except Exception as exc:
+            self._warn_once("Error while updating state for %s: %s", self._serial, exc)
+            raise
 
         if self._shutdown:
             return
