@@ -566,6 +566,7 @@ class IndegoHub:
         self._state_update_timeout = state_update_timeout
         self._weekly_area_entries = []
         self._last_completed_ts = None
+        self._last_error = {}
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -796,6 +797,15 @@ class IndegoHub:
         self._unsub_refresh_state()
         self._unsub_refresh_state = None
 
+    def _warn_once(self, msg: str, *args) -> None:
+        """Log a warning only if more than 60 seconds passed since last time."""
+        key = msg % args if args else msg
+        now = time.time()
+        last = self._last_error.get(key)
+        if last is None or now - last > 60:
+            _LOGGER.warning(msg, *args)
+            self._last_error[key] = now
+
     async def refresh_10m(self, _=None):
         """Refresh Indego sensors every 10m."""
         _LOGGER.debug("Refreshing 10m.")
@@ -882,7 +892,7 @@ class IndegoHub:
                 timeout=self._state_update_timeout,
             )
         except asyncio.TimeoutError:
-            _LOGGER.warning(
+            self._warn_once(
                 "Timeout on update_state() for %s – mower not available or too slow",
                 self._serial,
             )
@@ -897,7 +907,7 @@ class IndegoHub:
 
         state = self._indego_client.state
         if not state:
-            _LOGGER.warning("Received invalid state from mower")
+            self._warn_once("Received invalid state from mower")
             return
 
         mower_state = getattr(state, "mower_state", "unknown")
@@ -997,7 +1007,11 @@ class IndegoHub:
             self.entities[ENTITY_LAWN_MOWER].set_cloud_connection_state(online)
 
     async def _update_state(self, longpoll: bool = True):
-        await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+        try:
+            await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+        except Exception as exc:
+            self._warn_once("Error while updating state for %s: %s", self._serial, exc)
+            raise
 
         if self._shutdown:
             return
