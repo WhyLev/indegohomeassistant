@@ -80,6 +80,7 @@ ENTITY_FORECAST: Final = "forecast"
 ENTITY_BATTERY_CYCLES: Final = "battery_cycles"
 ENTITY_AVERAGE_MOW_TIME: Final = "average_mow_time"
 ENTITY_WEEKLY_AREA: Final = "weekly_area"
+ENTITY_API_ERRORS: Final = "api_errors"
 
 HTTP_HEADER_USER_AGENT: Final = "User-Agent"
 HTTP_HEADER_USER_AGENT_DEFAULT: Final = "HA/Indego"

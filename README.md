@@ -179,6 +179,15 @@ Required HACS Frontend Cards:
 
 All Indego models are supported. See [the GitHub repository](https://github.com/WhyLev/indegohomeassistant) for details.
 
+## 🛠️ Troubleshooting
+
+### 502 Bad Gateway
+A `502 Bad Gateway` error usually means the Bosch Indego service is temporarily unavailable. Wait a minute and try again. You can lower the request rate by increasing the **Position update interval** or enabling **Adaptive position updates** in the integration options. If calls still time out, raise the **State update timeout**.
+
+### Unknown mower state
+When the mower state shows as `unknown`, the mower did not respond before the timeout. Increase **State update timeout** and consider a longer **Position update interval** to reduce polling.
+
+
 ---
 
 ## ❤️ Credits

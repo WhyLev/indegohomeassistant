@@ -228,6 +228,14 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: "m²",
         CONF_ATTR: [],
     },
+    ENTITY_API_ERRORS: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "api errors",
+        CONF_ICON: "mdi:alert-circle-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: None,
+        CONF_ATTR: [],
+    },
     ENTITY_MOWING_MODE: {
         CONF_TYPE: SENSOR_TYPE,
         CONF_NAME: "mowing mode",
@@ -556,6 +564,7 @@ class IndegoHub:
         self._latest_alert = None
         self.entities = {}
         self._update_fail_count = None
+        self._api_error_count = 0
         self._lawn_map = None
         self._unsub_map_timer = None
         self._last_position = (None, None)
@@ -569,6 +578,8 @@ class IndegoHub:
         self._longpoll_timeout = longpoll_timeout
         self._weekly_area_entries = []
         self._last_completed_ts = None
+        self._last_state_ts = None
+        self._last_error = {}
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -610,6 +621,9 @@ class IndegoHub:
                     # added to Home Assistant by setting the protected
                     # attribute directly.
                     self.entities[entity_key]._state = self._serial
+                elif entity_key == ENTITY_API_ERRORS:
+                    # Initialize API error counter with zero
+                    self.entities[entity_key]._state = 0
 
             elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
                 self.entities[entity_key] = IndegoBinarySensor(
@@ -736,6 +750,22 @@ class IndegoHub:
         try:
             await self._update_state(longpoll=(self._update_fail_count is None or self._update_fail_count == 0))
             self._update_fail_count = 0
+            mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
+            if mower_state == "unknown":
+                _LOGGER.warning(
+                    "Received unknown state for %s, last success at %s – refreshing",
+                    self._serial,
+                    self._last_state_ts,
+                )
+                try:
+                    await self._update_state(longpoll=False)
+                except Exception as exc:  # noqa: BLE001
+                    update_failed = True
+                    _LOGGER.warning(
+                        "Retry after unknown state failed for %s: %s",
+                        self._serial,
+                        str(exc),
+                    )
 
         except Exception as exc:
             update_failed = True
@@ -798,6 +828,15 @@ class IndegoHub:
 
         self._unsub_refresh_state()
         self._unsub_refresh_state = None
+
+    def _warn_once(self, msg: str, *args) -> None:
+        """Log a warning only if more than 60 seconds passed since last time."""
+        key = msg % args if args else msg
+        now = time.time()
+        last = self._last_error.get(key)
+        if last is None or now - last > 60:
+            _LOGGER.warning(msg, *args)
+            self._last_error[key] = now
 
     async def refresh_10m(self, _=None):
         """Refresh Indego sensors every 10m."""
@@ -879,6 +918,43 @@ class IndegoHub:
         )
 
     async def _check_position_and_state(self, now):
+        delays = [0, 1, 2, 4]
+        for attempt, delay in enumerate(delays, 1):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                await asyncio.wait_for(
+                    self._indego_client.update_state(force=True),
+                    timeout=self._state_update_timeout,
+                )
+                if self._api_error_count:
+                    self._api_error_count = 0
+                    self.entities[ENTITY_API_ERRORS].state = 0
+                break
+            except ClientResponseError as exc:
+                if exc.status == 502:
+                    if attempt == len(delays):
+                        self._api_error_count += 1
+                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                        _LOGGER.warning(
+                            "Failed to update state for %s due to HTTP 502", self._serial
+                        )
+                        return
+                    continue
+                raise
+            except asyncio.TimeoutError:
+                _LOGGER.warning(
+                    "Timeout on update_state() for %s – mower not available or too slow",
+                    self._serial,
+                )
+                return
+            except Exception:
+                _LOGGER.exception(
+                    "Error on update_state() for %s – actual mower_state=%s",
+                    self._serial,
+                    self._last_state,
+                )
+                return
         try:
             await asyncio.wait_for(
                 self._indego_client.update_state(
@@ -887,7 +963,7 @@ class IndegoHub:
                 timeout=self._state_update_timeout,
             )
         except asyncio.TimeoutError:
-            _LOGGER.warning(
+            self._warn_once(
                 "Timeout on update_state() for %s – mower not available or too slow",
                 self._serial,
             )
@@ -902,13 +978,36 @@ class IndegoHub:
 
         state = self._indego_client.state
         if not state:
-            _LOGGER.warning("Received invalid state from mower")
+            self._warn_once("Received invalid state from mower")
             return
 
         mower_state = getattr(state, "mower_state", "unknown")
+        if mower_state == "unknown":
+            _LOGGER.warning(
+                "Received unknown state for %s, last success at %s – refreshing",
+                self._serial,
+                self._last_state_ts,
+            )
+            try:
+                await self._update_state(longpoll=False)
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.warning(
+                    "Retrying state refresh failed for %s: %s",
+                    self._serial,
+                    exc,
+                )
+                return
+            state = self._indego_client.state
+            if not state:
+                _LOGGER.warning("Received invalid state from mower after retry")
+                return
+            mower_state = getattr(state, "mower_state", "unknown")
+
         xpos = getattr(state, "svg_xPos", None)
         ypos = getattr(state, "svg_yPos", None)
         self._last_state = mower_state
+        if mower_state != "unknown":
+            self._last_state_ts = last_updated_now()
 
         if self._adaptive_updates:
             desired_interval = 60 if mower_state == "docked" else self._position_interval
@@ -921,7 +1020,7 @@ class IndegoHub:
 
         if xpos is not None and ypos is not None:
             if (xpos, ypos) != self._last_position:
-                _LOGGER.info("Position geändert: x=%s, y=%s", xpos, ypos)
+                _LOGGER.info("Position changed: x=%s, y=%s", xpos, ypos)
                 self._last_position = (xpos, ypos)
                 for entity in self.entities.values():
                     if hasattr(entity, "refresh_map"):
@@ -1005,6 +1104,29 @@ class IndegoHub:
         await self._indego_client.update_state(
             longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
         )
+        delays = [0, 1, 2, 4]
+        for attempt, delay in enumerate(delays, 1):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+                if self._api_error_count:
+                    self._api_error_count = 0
+                    self.entities[ENTITY_API_ERRORS].state = 0
+                break
+            except ClientResponseError as exc:
+                if exc.status == 502:
+                    if attempt == len(delays):
+                        self._api_error_count += 1
+                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                        raise
+                    continue
+                raise
+        try:
+            await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+        except Exception as exc:
+            self._warn_once("Error while updating state for %s: %s", self._serial, exc)
+            raise
 
         if self._shutdown:
             return
@@ -1016,7 +1138,10 @@ class IndegoHub:
         # Refresh Camera map if Position is available
         new_x = self._indego_client.state.svg_xPos
         new_y = self._indego_client.state.svg_yPos
-        mower_state = self._indego_client.state_description
+        mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
+
+        if mower_state != "unknown":
+            self._last_state_ts = last_updated_now()
 
         if new_x is not None and new_y is not None:
             for entity in self.entities.values():
