@@ -342,7 +342,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES),
         entry.options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH),
         entry.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
-        entry.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT)
+        entry.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT),
+        entry.options.get(CONF_LONGPOLL_TIMEOUT, DEFAULT_LONGPOLL_TIMEOUT)
     )
 
     await indego_hub.start_periodic_position_update()
@@ -532,6 +533,7 @@ class IndegoHub:
         progress_line_width: int = MAP_PROGRESS_LINE_WIDTH,
         progress_line_color: str = MAP_PROGRESS_LINE_COLOR,
         state_update_timeout: int = DEFAULT_STATE_UPDATE_TIMEOUT,
+        longpoll_timeout: int = DEFAULT_LONGPOLL_TIMEOUT,
     ):
         """Initialize the IndegoHub.
 
@@ -564,6 +566,7 @@ class IndegoHub:
         self._progress_line_width = progress_line_width
         self._progress_line_color = progress_line_color
         self._state_update_timeout = state_update_timeout
+        self._longpoll_timeout = longpoll_timeout
         self._weekly_area_entries = []
         self._last_completed_ts = None
 
@@ -878,7 +881,9 @@ class IndegoHub:
     async def _check_position_and_state(self, now):
         try:
             await asyncio.wait_for(
-                self._indego_client.update_state(force=True),
+                self._indego_client.update_state(
+                    force=True, longpoll_timeout=self._longpoll_timeout
+                ),
                 timeout=self._state_update_timeout,
             )
         except asyncio.TimeoutError:
@@ -997,7 +1002,9 @@ class IndegoHub:
             self.entities[ENTITY_LAWN_MOWER].set_cloud_connection_state(online)
 
     async def _update_state(self, longpoll: bool = True):
-        await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+        await self._indego_client.update_state(
+            longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
+        )
 
         if self._shutdown:
             return

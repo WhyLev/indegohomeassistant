@@ -27,10 +27,12 @@ CONF_POLLING: Final = "polling"
 CONF_POSITION_UPDATE_INTERVAL: Final = "position_update_interval"
 CONF_ADAPTIVE_POSITION_UPDATES: Final = "adaptive_position_updates"
 CONF_STATE_UPDATE_TIMEOUT: Final = "state_update_timeout"
+CONF_LONGPOLL_TIMEOUT: Final = "longpoll_timeout"
 
 DEFAULT_POSITION_UPDATE_INTERVAL: Final = 10
 DEFAULT_ADAPTIVE_POSITION_UPDATES: Final = True
 DEFAULT_STATE_UPDATE_TIMEOUT: Final = 10
+DEFAULT_LONGPOLL_TIMEOUT: Final = 230
 
 DEFAULT_NAME: Final = "Indego"
 DEFAULT_NAME_COMMANDS: Final = None
