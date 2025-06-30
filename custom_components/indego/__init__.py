@@ -575,6 +575,7 @@ class IndegoHub:
         self._state_update_timeout = state_update_timeout
         self._weekly_area_entries = []
         self._last_completed_ts = None
+        self._last_state_ts = None
         self._last_error = {}
 
         async def async_token_refresh() -> str:
@@ -746,6 +747,22 @@ class IndegoHub:
         try:
             await self._update_state(longpoll=(self._update_fail_count is None or self._update_fail_count == 0))
             self._update_fail_count = 0
+            mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
+            if mower_state == "unknown":
+                _LOGGER.warning(
+                    "Received unknown state for %s, last success at %s – refreshing",
+                    self._serial,
+                    self._last_state_ts,
+                )
+                try:
+                    await self._update_state(longpoll=False)
+                except Exception as exc:  # noqa: BLE001
+                    update_failed = True
+                    _LOGGER.warning(
+                        "Retry after unknown state failed for %s: %s",
+                        self._serial,
+                        str(exc),
+                    )
 
         except Exception as exc:
             update_failed = True
@@ -960,9 +977,32 @@ class IndegoHub:
             return
 
         mower_state = getattr(state, "mower_state", "unknown")
+        if mower_state == "unknown":
+            _LOGGER.warning(
+                "Received unknown state for %s, last success at %s – refreshing",
+                self._serial,
+                self._last_state_ts,
+            )
+            try:
+                await self._update_state(longpoll=False)
+            except Exception as exc:  # noqa: BLE001
+                _LOGGER.warning(
+                    "Retrying state refresh failed for %s: %s",
+                    self._serial,
+                    exc,
+                )
+                return
+            state = self._indego_client.state
+            if not state:
+                _LOGGER.warning("Received invalid state from mower after retry")
+                return
+            mower_state = getattr(state, "mower_state", "unknown")
+
         xpos = getattr(state, "svg_xPos", None)
         ypos = getattr(state, "svg_yPos", None)
         self._last_state = mower_state
+        if mower_state != "unknown":
+            self._last_state_ts = last_updated_now()
 
         if self._adaptive_updates:
             desired_interval = 60 if mower_state == "docked" else self._position_interval
@@ -1090,7 +1130,10 @@ class IndegoHub:
         # Refresh Camera map if Position is available
         new_x = self._indego_client.state.svg_xPos
         new_y = self._indego_client.state.svg_yPos
-        mower_state = self._indego_client.state_description
+        mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
+
+        if mower_state != "unknown":
+            self._last_state_ts = last_updated_now()
 
         if new_x is not None and new_y is not None:
             for entity in self.entities.values():
