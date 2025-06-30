@@ -45,7 +45,8 @@
                     "position_update_interval": "Position update interval (seconds)",
                     "adaptive_position_updates": "Reduce polling when mower is docked",
                     "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color"
+                    "progress_line_color": "Progress line color",
+                    "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)"
                 }
           }
       }
