@@ -32,6 +32,8 @@ from .const import (
     MAP_PROGRESS_LINE_COLOR,
     CONF_STATE_UPDATE_TIMEOUT,
     DEFAULT_STATE_UPDATE_TIMEOUT,
+    CONF_LONGPOLL_TIMEOUT,
+    DEFAULT_LONGPOLL_TIMEOUT,
     OAUTH2_CLIENT_ID,
     HTTP_HEADER_USER_AGENT,
     HTTP_HEADER_USER_AGENT_DEFAULT,
@@ -108,6 +110,10 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
                 vol.Optional(
                     CONF_STATE_UPDATE_TIMEOUT,
                     default=self.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT),
+                ): int,
+                vol.Optional(
+                    CONF_LONGPOLL_TIMEOUT,
+                    default=self.options.get(CONF_LONGPOLL_TIMEOUT, DEFAULT_LONGPOLL_TIMEOUT),
                 ): int,
             }
         )
@@ -203,6 +209,7 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
             self._options[CONF_PROGRESS_LINE_WIDTH] = user_input[CONF_PROGRESS_LINE_WIDTH]
             self._options[CONF_PROGRESS_LINE_COLOR] = user_input[CONF_PROGRESS_LINE_COLOR]
             self._options[CONF_STATE_UPDATE_TIMEOUT] = user_input[CONF_STATE_UPDATE_TIMEOUT]
+            self._options[CONF_LONGPOLL_TIMEOUT] = user_input[CONF_LONGPOLL_TIMEOUT]
 
             try:
                 self._mower_serials = await api_client.get_mowers()
@@ -266,6 +273,10 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
                 vol.Optional(
                     CONF_STATE_UPDATE_TIMEOUT,
                     default=(self._options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT))
+                ): int,
+                vol.Optional(
+                    CONF_LONGPOLL_TIMEOUT,
+                    default=(self._options.get(CONF_LONGPOLL_TIMEOUT, DEFAULT_LONGPOLL_TIMEOUT))
                 ): int,
             }
         )
