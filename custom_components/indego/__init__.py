@@ -228,6 +228,14 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: "m²",
         CONF_ATTR: [],
     },
+    ENTITY_API_ERRORS: {
+        CONF_TYPE: SENSOR_TYPE,
+        CONF_NAME: "api errors",
+        CONF_ICON: "mdi:alert-circle-outline",
+        CONF_DEVICE_CLASS: None,
+        CONF_UNIT_OF_MEASUREMENT: None,
+        CONF_ATTR: [],
+    },
     ENTITY_MOWING_MODE: {
         CONF_TYPE: SENSOR_TYPE,
         CONF_NAME: "mowing mode",
@@ -554,6 +562,7 @@ class IndegoHub:
         self._latest_alert = None
         self.entities = {}
         self._update_fail_count = None
+        self._api_error_count = 0
         self._lawn_map = None
         self._unsub_map_timer = None
         self._last_position = (None, None)
@@ -608,6 +617,9 @@ class IndegoHub:
                     # added to Home Assistant by setting the protected
                     # attribute directly.
                     self.entities[entity_key]._state = self._serial
+                elif entity_key == ENTITY_API_ERRORS:
+                    # Initialize API error counter with zero
+                    self.entities[entity_key]._state = 0
 
             elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
                 self.entities[entity_key] = IndegoBinarySensor(
@@ -886,6 +898,43 @@ class IndegoHub:
         )
 
     async def _check_position_and_state(self, now):
+        delays = [0, 1, 2, 4]
+        for attempt, delay in enumerate(delays, 1):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                await asyncio.wait_for(
+                    self._indego_client.update_state(force=True),
+                    timeout=self._state_update_timeout,
+                )
+                if self._api_error_count:
+                    self._api_error_count = 0
+                    self.entities[ENTITY_API_ERRORS].state = 0
+                break
+            except ClientResponseError as exc:
+                if exc.status == 502:
+                    if attempt == len(delays):
+                        self._api_error_count += 1
+                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                        _LOGGER.warning(
+                            "Failed to update state for %s due to HTTP 502", self._serial
+                        )
+                        return
+                    continue
+                raise
+            except asyncio.TimeoutError:
+                _LOGGER.warning(
+                    "Timeout on update_state() for %s – mower not available or too slow",
+                    self._serial,
+                )
+                return
+            except Exception:
+                _LOGGER.exception(
+                    "Error on update_state() for %s – actual mower_state=%s",
+                    self._serial,
+                    self._last_state,
+                )
+                return
         try:
             await asyncio.wait_for(
                 self._indego_client.update_state(force=True),
@@ -1007,6 +1056,24 @@ class IndegoHub:
             self.entities[ENTITY_LAWN_MOWER].set_cloud_connection_state(online)
 
     async def _update_state(self, longpoll: bool = True):
+        delays = [0, 1, 2, 4]
+        for attempt, delay in enumerate(delays, 1):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+                if self._api_error_count:
+                    self._api_error_count = 0
+                    self.entities[ENTITY_API_ERRORS].state = 0
+                break
+            except ClientResponseError as exc:
+                if exc.status == 502:
+                    if attempt == len(delays):
+                        self._api_error_count += 1
+                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                        raise
+                    continue
+                raise
         try:
             await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
         except Exception as exc:
