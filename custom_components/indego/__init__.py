@@ -1113,15 +1113,23 @@ class IndegoHub:
             self.entities[ENTITY_LAWN_MOWER].set_cloud_connection_state(online)
 
     async def _update_state(self, longpoll: bool = True):
-        await self._indego_client.update_state(
-            longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
+        await asyncio.wait_for(
+            self._indego_client.update_state(
+                longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
+            ),
+            timeout=self._state_update_timeout,
         )
         delays = [0, 1, 2, 4]
         for attempt, delay in enumerate(delays, 1):
             if delay:
                 await asyncio.sleep(delay)
             try:
-                await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+                await asyncio.wait_for(
+                    self._indego_client.update_state(
+                        longpoll=longpoll, longpoll_timeout=230
+                    ),
+                    timeout=self._state_update_timeout,
+                )
                 if self._api_error_count:
                     self._api_error_count = 0
                     self.entities[ENTITY_API_ERRORS].state = 0
@@ -1135,7 +1143,12 @@ class IndegoHub:
                     continue
                 raise
         try:
-            await self._indego_client.update_state(longpoll=longpoll, longpoll_timeout=230)
+            await asyncio.wait_for(
+                self._indego_client.update_state(
+                    longpoll=longpoll, longpoll_timeout=230
+                ),
+                timeout=self._state_update_timeout,
+            )
         except Exception as exc:
             self._warn_once("Error while updating state for %s: %s", self._serial, exc)
             raise
