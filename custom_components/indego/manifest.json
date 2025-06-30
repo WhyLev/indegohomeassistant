@@ -9,5 +9,6 @@
   "iot_class": "cloud_push",
   "version": "1.2",
   "version": "1.2.1",
+  "diagnostic": ["custom_components.indego.diagnostics"],
   "loggers": ["custom_components.indego", "pyIndego"]
 }
