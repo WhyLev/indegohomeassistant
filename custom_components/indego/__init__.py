@@ -1221,7 +1221,7 @@ class IndegoHub:
             try:
                 await asyncio.wait_for(
                     self._indego_client.update_state(
-                        longpoll=longpoll, longpoll_timeout=230
+                        longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
                     ),
                     timeout=self._state_update_timeout,
                 )
@@ -1243,7 +1243,7 @@ class IndegoHub:
         try:
             await asyncio.wait_for(
                 self._indego_client.update_state(
-                    longpoll=longpoll, longpoll_timeout=230
+                    longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
                 ),
                 timeout=self._state_update_timeout,
             )
