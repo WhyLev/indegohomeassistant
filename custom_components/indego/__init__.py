@@ -981,6 +981,7 @@ class IndegoHub:
         )
 
     async def _check_position_and_state(self, now):
+        delays = [0, 1, 2, 4, 8]
         if self._in_cooldown():
             _LOGGER.debug(
                 "Skipping position update for %s due to cooldown", self._serial
@@ -992,7 +993,9 @@ class IndegoHub:
                 await asyncio.sleep(delay)
             try:
                 await asyncio.wait_for(
-                    self._indego_client.update_state(force=True),
+                    self._indego_client.update_state(
+                        force=True, longpoll_timeout=self._longpoll_timeout
+                    ),
                     timeout=self._state_update_timeout,
                 )
                 if self._api_error_count:
@@ -1000,6 +1003,7 @@ class IndegoHub:
                     self.entities[ENTITY_API_ERRORS].state = 0
                 break
             except ClientResponseError as exc:
+                if exc.status in (502, 429) and attempt < len(delays):
                 if exc.status == 429:
                     self._handle_rate_limit(exc)
                     return
@@ -1012,7 +1016,14 @@ class IndegoHub:
                         )
                         return
                     continue
-                raise
+                self._api_error_count += 1
+                self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                _LOGGER.warning(
+                    "Failed to update state for %s due to HTTP %s",
+                    self._serial,
+                    exc.status,
+                )
+                return
             except asyncio.TimeoutError:
                 _LOGGER.warning(
                     "Timeout on update_state() for %s – mower not available or too slow",
@@ -1199,6 +1210,7 @@ class IndegoHub:
             self.entities[ENTITY_LAWN_MOWER].set_cloud_connection_state(online)
 
     async def _update_state(self, longpoll: bool = True):
+        delays = [0, 1, 2, 4, 8]
         if self._in_cooldown():
             _LOGGER.debug("Skipping state update for %s due to cooldown", self._serial)
             return
@@ -1230,6 +1242,7 @@ class IndegoHub:
                     self.entities[ENTITY_API_ERRORS].state = 0
                 break
             except ClientResponseError as exc:
+                if exc.status in (502, 429) and attempt < len(delays):
                 if exc.status == 429:
                     self._handle_rate_limit(exc)
                     return
@@ -1239,6 +1252,20 @@ class IndegoHub:
                         self.entities[ENTITY_API_ERRORS].state = self._api_error_count
                         raise
                     continue
+                self._api_error_count += 1
+                self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                self._warn_once(
+                    "Error while updating state for %s: HTTP %s",
+                    self._serial,
+                    exc.status,
+                )
+                raise
+            except Exception as exc:
+                self._warn_once(
+                    "Error while updating state for %s: %s",
+                    self._serial,
+                    exc,
+                )
                 raise
         try:
             await asyncio.wait_for(
