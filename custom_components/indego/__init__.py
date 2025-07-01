@@ -1020,18 +1020,25 @@ class IndegoHub:
                 break
             except ClientResponseError as exc:
                 if exc.status in (502, 429) and attempt < len(delays):
-                if exc.status == 429:
-                    self._handle_rate_limit(exc)
-                    return
-                if exc.status == 502:
-                    if attempt == len(delays):
-                        self._log_api_error("502", "Failed to update state for %s due to HTTP 502" % self._serial, exc)
+                    if exc.status == 429:
+                        self._handle_rate_limit(exc)
                         return
-                    continue
+                    if exc.status == 502:
+                        if attempt == len(delays):
+                            self._log_api_error(
+                                "502",
+                                "Failed to update state for %s due to HTTP 502" % self._serial,
+                                exc,
+                            )
+                            return
+                        continue
                 if exc.status == 429:
-                    self._log_api_error("429", "Failed to update state for %s due to HTTP 429" % self._serial, exc)
+                    self._log_api_error(
+                        "429",
+                        "Failed to update state for %s due to HTTP 429" % self._serial,
+                        exc,
+                    )
                     return
-                raise
                 self._api_error_count += 1
                 self.entities[ENTITY_API_ERRORS].state = self._api_error_count
                 _LOGGER.warning(
@@ -1249,16 +1256,24 @@ class IndegoHub:
                 break
             except ClientResponseError as exc:
                 if exc.status in (502, 429) and attempt < len(delays):
+                    if exc.status == 429:
+                        self._handle_rate_limit(exc)
+                        return
+                    if exc.status == 502:
+                        if attempt == len(delays):
+                            self._log_api_error(
+                                "502",
+                                "Failed to update state for %s due to HTTP 502" % self._serial,
+                                exc,
+                            )
+                            raise
+                        continue
                 if exc.status == 429:
-                    self._handle_rate_limit(exc)
-                    return
-                if exc.status == 502:
-                    if attempt == len(delays):
-                        self._log_api_error("502", "Failed to update state for %s due to HTTP 502" % self._serial, exc)
-                        raise
-                    continue
-                if exc.status == 429:
-                    self._log_api_error("429", "Failed to update state for %s due to HTTP 429" % self._serial, exc)
+                    self._log_api_error(
+                        "429",
+                        "Failed to update state for %s due to HTTP 429" % self._serial,
+                        exc,
+                    )
                     raise
                 self._api_error_count += 1
                 self.entities[ENTITY_API_ERRORS].state = self._api_error_count
