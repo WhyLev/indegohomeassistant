@@ -100,6 +100,14 @@ MAP_PROGRESS_LINE_WIDTH: Final = 6
 # Default color of progress lines drawn on the map camera
 MAP_PROGRESS_LINE_COLOR: Final = "#808080"
 
+# Delay in seconds before a state change is written to Home Assistant. Used to
+# debounce very frequent mower state transitions.
+STATE_DEBOUNCE_SECONDS: Final = 20
+
+# Minimum time a mower must stay offline before setting the entities to
+# unavailable. Short network glitches should not trigger unavailable states.
+OFFLINE_GRACE_PERIOD: Final = 30
+
 # Configuration options for map progress path appearance
 CONF_PROGRESS_LINE_WIDTH: Final = "progress_line_width"
 CONF_PROGRESS_LINE_COLOR: Final = "progress_line_color"
