@@ -89,6 +89,10 @@ HTTP_HEADER_USER_AGENT_DEFAULTS: Final = [
     "HA/Indego"
 ]
 
+# Default delay in seconds when the API returns HTTP 429 without a
+# ``Retry-After`` header.
+RETRY_AFTER_DEFAULT: Final = 60
+
 # Width of progress lines drawn on the map camera (in pixels)
 MAP_PROGRESS_LINE_WIDTH: Final = 6
 # Default color of progress lines drawn on the map camera
