@@ -564,7 +564,6 @@ class IndegoHub:
         self._latest_alert = None
         self.entities = {}
         self._update_fail_count = None
-        self._api_error_count = 0
         self._lawn_map = None
         self._unsub_map_timer = None
         self._last_position = (None, None)
@@ -580,6 +579,8 @@ class IndegoHub:
         self._last_completed_ts = None
         self._last_state_ts = None
         self._last_error = {}
+        self._error_log = {}
+        self._api_error_stats = {}
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -624,6 +625,7 @@ class IndegoHub:
                 elif entity_key == ENTITY_API_ERRORS:
                     # Initialize API error counter with zero
                     self.entities[entity_key]._state = 0
+                    self.entities[entity_key].set_attributes({})
 
             elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
                 self.entities[entity_key] = IndegoBinarySensor(
@@ -844,6 +846,23 @@ class IndegoHub:
             _LOGGER.warning(msg, *args)
             self._last_error[key] = now
 
+    def _log_api_error(self, err_type: str, msg: str, exc: Exception | None = None) -> None:
+        """Log stack traces throttled per error type and count occurrences."""
+        info = self._error_log.get(err_type, {"last": 0, "count": 0})
+        now = time.time()
+        if now - info["last"] > API_ERROR_LOG_INTERVAL:
+            if info["count"]:
+                _LOGGER.warning("%s occurred %i more times", err_type, info["count"])
+            if exc is not None:
+                _LOGGER.exception(msg)
+            else:
+                _LOGGER.warning(msg)
+            info = {"last": now, "count": 0}
+        else:
+            info["count"] += 1
+        self._error_log[err_type] = info
+        self._api_error_stats[err_type] = self._api_error_stats.get(err_type, 0) + 1
+
     async def refresh_10m(self, _=None):
         """Refresh Indego sensors every 10m."""
         _LOGGER.debug("Refreshing 10m.")
@@ -871,6 +890,7 @@ class IndegoHub:
                         index,
                         self._serial,
                     )
+        await self._update_api_error_sensor()
 
         self._refresh_10m_remover = async_call_later(
             self._hass, next_refresh, self.refresh_10m
@@ -933,33 +953,22 @@ class IndegoHub:
                     self._indego_client.update_state(force=True),
                     timeout=self._state_update_timeout,
                 )
-                if self._api_error_count:
-                    self._api_error_count = 0
-                    self.entities[ENTITY_API_ERRORS].state = 0
                 break
             except ClientResponseError as exc:
                 if exc.status == 502:
                     if attempt == len(delays):
-                        self._api_error_count += 1
-                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
-                        _LOGGER.warning(
-                            "Failed to update state for %s due to HTTP 502", self._serial
-                        )
+                        self._log_api_error("502", "Failed to update state for %s due to HTTP 502" % self._serial, exc)
                         return
                     continue
+                if exc.status == 429:
+                    self._log_api_error("429", "Failed to update state for %s due to HTTP 429" % self._serial, exc)
+                    return
                 raise
             except asyncio.TimeoutError:
-                _LOGGER.warning(
-                    "Timeout on update_state() for %s – mower not available or too slow",
-                    self._serial,
-                )
+                self._log_api_error("timeout", "Timeout on update_state() for %s – mower not available or too slow" % self._serial)
                 return
-            except Exception:
-                _LOGGER.exception(
-                    "Error on update_state() for %s – actual mower_state=%s",
-                    self._serial,
-                    self._last_state,
-                )
+            except Exception as exc:
+                self._log_api_error("other", "Error on update_state() for %s – actual mower_state=%s" % (self._serial, self._last_state), exc)
                 return
         try:
             await asyncio.wait_for(
@@ -969,16 +978,16 @@ class IndegoHub:
                 timeout=self._state_update_timeout,
             )
         except asyncio.TimeoutError:
-            self._warn_once(
-                "Timeout on update_state() for %s – mower not available or too slow",
-                self._serial,
+            self._log_api_error(
+                "timeout",
+                "Timeout on update_state() for %s – mower not available or too slow" % self._serial,
             )
             return
         except Exception as e:
-            _LOGGER.exception(
-                "Error on update_state() for %s – actual mower_state=%s",
-                self._serial,
-                self._last_state,
+            self._log_api_error(
+                "other",
+                "Error on update_state() for %s – actual mower_state=%s" % (self._serial, self._last_state),
+                e,
             )
             return
 
@@ -1003,9 +1012,9 @@ class IndegoHub:
             try:
                 await self._update_state(longpoll=False)
             except Exception as exc:  # noqa: BLE001
-                _LOGGER.warning(
-                    "Retrying state refresh failed for %s: %s",
-                    self._serial,
+                self._log_api_error(
+                    "other",
+                    "Retrying state refresh failed for %s: %s" % (self._serial, exc),
                     exc,
                 )
                 return
@@ -1042,16 +1051,16 @@ class IndegoHub:
         try:
             await self._indego_client.update_operating_data()
         except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
-            _LOGGER.warning(
-                "Timeout while updating operating data for %s. This usually means the mower did not respond in time: %s",
-                self._serial,
+            self._log_api_error(
+                "timeout",
+                "Timeout while updating operating data for %s. This usually means the mower did not respond in time: %s" % (self._serial, exc),
                 exc,
             )
             return
         except Exception as exc:  # noqa: BLE001
-            _LOGGER.warning(
-                "Failed to update operating data for %s: %s",
-                self._serial,
+            self._log_api_error(
+                "other",
+                "Failed to update operating data for %s: %s" % (self._serial, exc),
                 exc,
             )
             return
@@ -1130,17 +1139,16 @@ class IndegoHub:
                     ),
                     timeout=self._state_update_timeout,
                 )
-                if self._api_error_count:
-                    self._api_error_count = 0
-                    self.entities[ENTITY_API_ERRORS].state = 0
                 break
             except ClientResponseError as exc:
                 if exc.status == 502:
                     if attempt == len(delays):
-                        self._api_error_count += 1
-                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                        self._log_api_error("502", "Failed to update state for %s due to HTTP 502" % self._serial, exc)
                         raise
                     continue
+                if exc.status == 429:
+                    self._log_api_error("429", "Failed to update state for %s due to HTTP 429" % self._serial, exc)
+                    raise
                 raise
         try:
             await asyncio.wait_for(
@@ -1150,7 +1158,7 @@ class IndegoHub:
                 timeout=self._state_update_timeout,
             )
         except Exception as exc:
-            self._warn_once("Error while updating state for %s: %s", self._serial, exc)
+            self._log_api_error("other", "Error while updating state for %s: %s" % (self._serial, exc), exc)
             raise
 
         if self._shutdown:
@@ -1324,8 +1332,10 @@ class IndegoHub:
         try:
             await self._indego_client.update_next_mow()
         except Exception as exc:
-            _LOGGER.warning(
-                "Failed to update next mow for %s: %s", self._serial, exc
+            self._log_api_error(
+                "other",
+                "Failed to update next mow for %s: %s" % (self._serial, exc),
+                exc,
             )
             return
 
@@ -1366,6 +1376,13 @@ class IndegoHub:
                     "recommended_next_mow": next_start,
                 }
             )
+
+    async def _update_api_error_sensor(self, _=None):
+        """Update the API error sensor with aggregated counts."""
+        if ENTITY_API_ERRORS not in self.entities:
+            return
+        self.entities[ENTITY_API_ERRORS].state = sum(self._api_error_stats.values())
+        self.entities[ENTITY_API_ERRORS].set_attributes(dict(self._api_error_stats))
 
     @property
     def serial(self) -> str:
