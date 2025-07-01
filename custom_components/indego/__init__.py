@@ -898,9 +898,16 @@ class IndegoHub:
         try:
             svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
             if svg_bytes:
-                async with aiofiles.open(self.map_path(), "wb") as f:
-                    await f.write(svg_bytes)
-                _LOGGER.info("Map saved in %s", self.map_path())
+                path = self.map_path()
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                try:
+                    async with aiofiles.open(path, "wb") as f:
+                        await f.write(svg_bytes)
+                    _LOGGER.info("Map saved in %s", path)
+                except OSError as exc:
+                    self._warn_once(
+                        "Error during saving the map [%s]: %s", self._serial, exc
+                    )
         except ClientResponseError as exc:
             _LOGGER.warning(
                 "Map download for %s failed: HTTP %s - %s",
@@ -909,7 +916,7 @@ class IndegoHub:
                 exc.message,
             )
         except Exception as e:  # noqa: BLE001
-            _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
+            self._warn_once("Error during saving the map [%s]: %s", self._serial, e)
 
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
