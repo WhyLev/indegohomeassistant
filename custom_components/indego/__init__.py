@@ -81,6 +81,10 @@ SERVICE_SCHEMA_DOWNLOAD_MAP = vol.Schema({
     vol.Required(CONF_MOWER_SERIAL): cv.string
 })
 
+SERVICE_SCHEMA_REFRESH = vol.Schema({
+    vol.Optional(CONF_MOWER_SERIAL): cv.string
+})
+
 
 def FUNC_ICON_MOWER_ALERT(state):
     if state:
@@ -452,6 +456,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.debug("Indego.download_map service called for serial: %s", instance.serial)
         await instance.download_and_store_map()
 
+    async def async_refresh(call):
+        """Handle the refresh service call."""
+        instance = find_instance_for_mower_service_call(call)
+        if instance._unsub_refresh_state is not None:
+            _LOGGER.debug("Refresh skipped due to cooldown for serial: %s", instance.serial)
+            return
+        _LOGGER.debug("Indego.refresh service called for serial: %s", instance.serial)
+        await asyncio.gather(
+            instance.refresh_state(),
+            instance.refresh_10m(),
+            instance.refresh_24h(),
+        )
+
     # In HASS we can have multiple Indego component instances as long as the mower serial is unique.
     # So the mower services should only need to be registered for the first instance.
     if CONF_SERVICES_REGISTERED not in hass.data[DOMAIN]:
@@ -499,6 +516,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_NAME_DOWNLOAD_MAP,
             async_download_map,
             schema=SERVICE_SCHEMA_DOWNLOAD_MAP
+        )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_NAME_REFRESH,
+            async_refresh,
+            schema=SERVICE_SCHEMA_REFRESH,
         )
 
         hass.data[DOMAIN][CONF_SERVICES_REGISTERED] = entry.entry_id

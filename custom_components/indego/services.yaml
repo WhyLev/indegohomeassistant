@@ -63,3 +63,10 @@ download_map:
       description: Serial number of the mower for which the map should be downloaded.
       example: '"YOUR_SERIALNUMBER"'
       required: true
+refresh:
+  description: Trigger an immediate data refresh if no cooldown is active.
+  fields:
+    mower_serial:
+      description: Mower serial. Only needed when you have configured multiple mowers.
+      example: '"YOUR_SERIALNUMBER"'
+      required: false
