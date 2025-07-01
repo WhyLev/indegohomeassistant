@@ -26,6 +26,7 @@ This fork combines the solid Bosch Indego integration developed by [sander1988](
 * Map position updates every 10 seconds by default (configurable)
 * State update timeout configurable via `state_update_timeout` option (default 10s)
 * Download the mower map once using the `indego.download_map` service
+* Force a data refresh anytime via the `indego.refresh` service
 * Forecast sensor with rain probability & mow suggestion
 * Mushroom-based Lovelace dashboard with
 
@@ -146,6 +147,7 @@ You can call the following services:
 | `indego.delete_alert`     | Delete one alert                       |
 | `indego.delete_alert_all` | Delete all alerts                      |
 | `indego.download_map`     | Save the mower map to `www/indego_map_SERIALNUMBER.svg` |
+| `indego.refresh`          | Refresh mower data immediately (if not in cooldown) |
 
 The map file is saved inside Home Assistant's configuration directory. On
 standard installations this is accessible at `/config/www` from within the
