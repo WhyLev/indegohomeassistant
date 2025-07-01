@@ -46,7 +46,8 @@
                     "adaptive_position_updates": "Reduce polling when mower is docked",
                     "progress_line_width": "Progress line width (px)",
                     "progress_line_color": "Progress line color",
-                    "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)"
+                    "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
+                    "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
                 }
           }
       }

@@ -42,8 +42,9 @@
                   "show_all_alerts": "Toon de volledige melding/waarschuwing geschiedenis in HomeAssistant. Dit wordt niet aangeraden voor de meeste gebruikers, het heeft mogelijk een significante impact op de HomeAssistant database!",
                   "progress_line_width": "Progress line width (px)",
                   "progress_line_color": "Progress line color",
-                  "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)"
-              }
+                  "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
+                  "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
+                }
           }
       }
     },
