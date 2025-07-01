@@ -651,7 +651,10 @@ class IndegoHub:
                 elif entity_key == ENTITY_API_ERRORS:
                     # Initialize API error counter with zero
                     self.entities[entity_key]._state = 0
-                    self.entities[entity_key].set_attributes({})
+                    # Avoid scheduling a state update before the entity is
+                    # added to Home Assistant. Attributes will be set once
+                    # the entity is registered, so disable sync here.
+                    self.entities[entity_key].set_attributes({}, sync_state=False)
 
             elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
                 self.entities[entity_key] = IndegoBinarySensor(
