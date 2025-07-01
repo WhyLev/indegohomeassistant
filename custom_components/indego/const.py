@@ -32,7 +32,7 @@ CONF_LONGPOLL_TIMEOUT: Final = "longpoll_timeout"
 DEFAULT_POSITION_UPDATE_INTERVAL: Final = 10
 DEFAULT_ADAPTIVE_POSITION_UPDATES: Final = True
 DEFAULT_STATE_UPDATE_TIMEOUT: Final = 10
-DEFAULT_LONGPOLL_TIMEOUT: Final = 230
+DEFAULT_LONGPOLL_TIMEOUT: Final = 60
 
 DEFAULT_NAME: Final = "Indego"
 DEFAULT_NAME_COMMANDS: Final = None
@@ -44,6 +44,7 @@ SERVICE_NAME_READ_ALERT: Final = "read_alert"
 SERVICE_NAME_DELETE_ALERT_ALL: Final = "delete_alert_all"
 SERVICE_NAME_READ_ALERT_ALL: Final = "read_alert_all"
 SERVICE_NAME_DOWNLOAD_MAP: Final = "download_map"
+SERVICE_NAME_REFRESH: Final = "refresh"
 SERVER_DATA_ALERT_INDEX: Final = "alert_index"
 
 CAMERA_TYPE: Final = "camera"
@@ -88,6 +89,10 @@ HTTP_HEADER_USER_AGENT_DEFAULTS: Final = [
     "HomeAssistant/Indego",
     "HA/Indego"
 ]
+
+# Default delay in seconds when the API returns HTTP 429 without a
+# ``Retry-After`` header.
+RETRY_AFTER_DEFAULT: Final = 60
 
 # Width of progress lines drawn on the map camera (in pixels)
 MAP_PROGRESS_LINE_WIDTH: Final = 6

@@ -6,6 +6,7 @@ import time
 import aiofiles
 import os
 from datetime import datetime, timedelta
+from email.utils import parsedate_to_datetime
 from aiohttp.client_exceptions import ClientResponseError
 
 import homeassistant.util.dt
@@ -79,6 +80,10 @@ SERVICE_SCHEMA_READ_ALERT_ALL = vol.Schema({
 
 SERVICE_SCHEMA_DOWNLOAD_MAP = vol.Schema({
     vol.Required(CONF_MOWER_SERIAL): cv.string
+})
+
+SERVICE_SCHEMA_REFRESH = vol.Schema({
+    vol.Optional(CONF_MOWER_SERIAL): cv.string
 })
 
 
@@ -452,6 +457,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.debug("Indego.download_map service called for serial: %s", instance.serial)
         await instance.download_and_store_map()
 
+    async def async_refresh(call):
+        """Handle the refresh service call."""
+        instance = find_instance_for_mower_service_call(call)
+        if instance._unsub_refresh_state is not None:
+            _LOGGER.debug("Refresh skipped due to cooldown for serial: %s", instance.serial)
+            return
+        _LOGGER.debug("Indego.refresh service called for serial: %s", instance.serial)
+        await asyncio.gather(
+            instance.refresh_state(),
+            instance.refresh_10m(),
+            instance.refresh_24h(),
+        )
+
     # In HASS we can have multiple Indego component instances as long as the mower serial is unique.
     # So the mower services should only need to be registered for the first instance.
     if CONF_SERVICES_REGISTERED not in hass.data[DOMAIN]:
@@ -499,6 +517,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_NAME_DOWNLOAD_MAP,
             async_download_map,
             schema=SERVICE_SCHEMA_DOWNLOAD_MAP
+        )
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_NAME_REFRESH,
+            async_refresh,
+            schema=SERVICE_SCHEMA_REFRESH,
         )
 
         hass.data[DOMAIN][CONF_SERVICES_REGISTERED] = entry.entry_id
@@ -580,6 +605,7 @@ class IndegoHub:
         self._last_completed_ts = None
         self._last_state_ts = None
         self._last_error = {}
+        self._next_request_ts = 0
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -844,6 +870,30 @@ class IndegoHub:
             _LOGGER.warning(msg, *args)
             self._last_error[key] = now
 
+    def _in_cooldown(self) -> bool:
+        """Return True if requests are currently rate limited."""
+        return time.time() < self._next_request_ts
+
+    def _handle_rate_limit(self, exc: ClientResponseError) -> None:
+        """Process HTTP 429 errors and set cooldown."""
+        retry_after = exc.headers.get("Retry-After") if exc.headers else None
+        delay = RETRY_AFTER_DEFAULT
+        if retry_after:
+            try:
+                delay = int(retry_after)
+            except ValueError:
+                try:
+                    delay_dt = parsedate_to_datetime(retry_after)
+                    delay = max(0, (delay_dt - datetime.utcnow()).total_seconds())
+                except Exception:  # noqa: BLE001
+                    delay = RETRY_AFTER_DEFAULT
+        self._next_request_ts = time.time() + delay
+        self._warn_once(
+            "Rate limit reached for %s, delaying API calls for %s seconds",
+            self._serial,
+            int(delay),
+        )
+
     async def refresh_10m(self, _=None):
         """Refresh Indego sensors every 10m."""
         _LOGGER.debug("Refreshing 10m.")
@@ -898,9 +948,16 @@ class IndegoHub:
         try:
             svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
             if svg_bytes:
-                async with aiofiles.open(self.map_path(), "wb") as f:
-                    await f.write(svg_bytes)
-                _LOGGER.info("Map saved in %s", self.map_path())
+                path = self.map_path()
+                os.makedirs(os.path.dirname(path), exist_ok=True)
+                try:
+                    async with aiofiles.open(path, "wb") as f:
+                        await f.write(svg_bytes)
+                    _LOGGER.info("Map saved in %s", path)
+                except OSError as exc:
+                    self._warn_once(
+                        "Error during saving the map [%s]: %s", self._serial, exc
+                    )
         except ClientResponseError as exc:
             _LOGGER.warning(
                 "Map download for %s failed: HTTP %s - %s",
@@ -909,7 +966,7 @@ class IndegoHub:
                 exc.message,
             )
         except Exception as e:  # noqa: BLE001
-            _LOGGER.warning("Error during saving the map [%s]: %s", self._serial, e)
+            self._warn_once("Error during saving the map [%s]: %s", self._serial, e)
 
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
@@ -925,6 +982,12 @@ class IndegoHub:
 
     async def _check_position_and_state(self, now):
         delays = [0, 1, 2, 4, 8]
+        if self._in_cooldown():
+            _LOGGER.debug(
+                "Skipping position update for %s due to cooldown", self._serial
+            )
+            return
+        delays = [0, 1, 2, 4]
         for attempt, delay in enumerate(delays, 1):
             if delay:
                 await asyncio.sleep(delay)
@@ -941,6 +1004,17 @@ class IndegoHub:
                 break
             except ClientResponseError as exc:
                 if exc.status in (502, 429) and attempt < len(delays):
+                if exc.status == 429:
+                    self._handle_rate_limit(exc)
+                    return
+                if exc.status == 502:
+                    if attempt == len(delays):
+                        self._api_error_count += 1
+                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                        _LOGGER.warning(
+                            "Failed to update state for %s due to HTTP 502", self._serial
+                        )
+                        return
                     continue
                 self._api_error_count += 1
                 self.entities[ENTITY_API_ERRORS].state = self._api_error_count
@@ -963,6 +1037,31 @@ class IndegoHub:
                     self._last_state,
                 )
                 return
+        try:
+            await asyncio.wait_for(
+                self._indego_client.update_state(
+                    force=True, longpoll_timeout=self._longpoll_timeout
+                ),
+                timeout=self._state_update_timeout,
+            )
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
+        except asyncio.TimeoutError:
+            self._warn_once(
+                "Timeout on update_state() for %s – mower not available or too slow",
+                self._serial,
+            )
+            return
+        except Exception as e:
+            _LOGGER.exception(
+                "Error on update_state() for %s – actual mower_state=%s",
+                self._serial,
+                self._last_state,
+            )
+            return
 
         state = self._indego_client.state
         if not state:
@@ -1021,6 +1120,11 @@ class IndegoHub:
                         await entity.refresh_map(mower_state)
     
     async def _update_operating_data(self):
+        if self._in_cooldown():
+            _LOGGER.debug(
+                "Skipping operating data update for %s due to cooldown", self._serial
+            )
+            return
         try:
             await self._indego_client.update_operating_data()
         except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
@@ -1028,6 +1132,17 @@ class IndegoHub:
                 "Timeout while updating operating data for %s. This usually means the mower did not respond in time: %s",
                 self._serial,
                 exc,
+            )
+            return
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            _LOGGER.warning(
+                "Failed to update operating data for %s: HTTP %s - %s",
+                self._serial,
+                exc.status,
+                exc.message,
             )
             return
         except Exception as exc:  # noqa: BLE001
@@ -1096,6 +1211,22 @@ class IndegoHub:
 
     async def _update_state(self, longpoll: bool = True):
         delays = [0, 1, 2, 4, 8]
+        if self._in_cooldown():
+            _LOGGER.debug("Skipping state update for %s due to cooldown", self._serial)
+            return
+        try:
+            await asyncio.wait_for(
+                self._indego_client.update_state(
+                    longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
+                ),
+                timeout=self._state_update_timeout,
+            )
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
+        delays = [0, 1, 2, 4]
         for attempt, delay in enumerate(delays, 1):
             if delay:
                 await asyncio.sleep(delay)
@@ -1112,6 +1243,14 @@ class IndegoHub:
                 break
             except ClientResponseError as exc:
                 if exc.status in (502, 429) and attempt < len(delays):
+                if exc.status == 429:
+                    self._handle_rate_limit(exc)
+                    return
+                if exc.status == 502:
+                    if attempt == len(delays):
+                        self._api_error_count += 1
+                        self.entities[ENTITY_API_ERRORS].state = self._api_error_count
+                        raise
                     continue
                 self._api_error_count += 1
                 self.entities[ENTITY_API_ERRORS].state = self._api_error_count
@@ -1128,6 +1267,21 @@ class IndegoHub:
                     exc,
                 )
                 raise
+        try:
+            await asyncio.wait_for(
+                self._indego_client.update_state(
+                    longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
+                ),
+                timeout=self._state_update_timeout,
+            )
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
+        except Exception as exc:
+            self._warn_once("Error while updating state for %s: %s", self._serial, exc)
+            raise
 
         if self._shutdown:
             return
@@ -1208,7 +1362,18 @@ class IndegoHub:
             self.entities[ENTITY_LAWN_MOWER].indego_state = self._indego_client.state.state
 
     async def _update_generic_data(self):
-        await self._indego_client.update_generic_data()
+        if self._in_cooldown():
+            _LOGGER.debug(
+                "Skipping generic data update for %s due to cooldown", self._serial
+            )
+            return
+        try:
+            await self._indego_client.update_generic_data()
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
 
         if self._indego_client.generic_data:
             if ENTITY_MOWING_MODE in self.entities:
@@ -1224,7 +1389,18 @@ class IndegoHub:
         return self._indego_client.generic_data
 
     async def _update_alerts(self):
-        await self._indego_client.update_alerts()
+        if self._in_cooldown():
+            _LOGGER.debug(
+                "Skipping alerts update for %s due to cooldown", self._serial
+            )
+            return
+        try:
+            await self._indego_client.update_alerts()
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
 
         self.entities[ENTITY_ALERT].state = self._indego_client.alerts_count > 0
 
@@ -1264,12 +1440,35 @@ class IndegoHub:
             )
 
     async def _update_updates_available(self):
-        await self._indego_client.update_updates_available()
+        if self._in_cooldown():
+            _LOGGER.debug(
+                "Skipping update check for %s due to cooldown", self._serial
+            )
+            return
+        try:
+            await self._indego_client.update_updates_available()
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
 
         self.entities[ENTITY_UPDATE_AVAILABLE].state = self._indego_client.update_available
 
     async def _update_last_completed_mow(self):
-        await self._indego_client.update_last_completed_mow()
+        if self._in_cooldown():
+            _LOGGER.debug(
+                "Skipping last completed mow update for %s due to cooldown",
+                self._serial,
+            )
+            return
+        try:
+            await self._indego_client.update_last_completed_mow()
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
 
         if self._indego_client.last_completed_mow:
             self.entities[
@@ -1297,8 +1496,22 @@ class IndegoHub:
                         self._weekly_area_entries = [ (t, a) for t, a in self._weekly_area_entries if t >= week_ago ]
 
     async def _update_next_mow(self):
+        if self._in_cooldown():
+            _LOGGER.debug("Skipping next mow update for %s due to cooldown", self._serial)
+            return
         try:
             await self._indego_client.update_next_mow()
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            _LOGGER.warning(
+                "Failed to update next mow for %s: HTTP %s - %s",
+                self._serial,
+                exc.status,
+                exc.message,
+            )
+            return
         except Exception as exc:
             _LOGGER.warning(
                 "Failed to update next mow for %s: %s", self._serial, exc
@@ -1319,7 +1532,16 @@ class IndegoHub:
             )
 
     async def _update_forecast(self):
-        await self._indego_client.update_predictive_calendar()
+        if self._in_cooldown():
+            _LOGGER.debug("Skipping forecast update for %s due to cooldown", self._serial)
+            return
+        try:
+            await self._indego_client.update_predictive_calendar()
+        except ClientResponseError as exc:
+            if exc.status == 429:
+                self._handle_rate_limit(exc)
+                return
+            raise
 
         if self._indego_client.predictive_calendar:
             calendar = self._indego_client.predictive_calendar
