@@ -607,6 +607,12 @@ class IndegoHub:
         self._error_log = {}
         self._api_error_stats = {}
         self._next_request_ts = 0
+        self._online = False
+        self._offline_since = None
+        self._offline_failures = 0
+        self._pending_mower_state = None
+        self._pending_mower_detail = None
+        self._debounce_remover = None
 
         async def async_token_refresh() -> str:
             await session.async_ensure_token_valid()
@@ -866,6 +872,40 @@ class IndegoHub:
         self._unsub_refresh_state()
         self._unsub_refresh_state = None
 
+    def _apply_pending_state(self, _=None):
+        """Apply a debounced mower state update."""
+        self._debounce_remover = None
+        if self._pending_mower_state is None:
+            return
+
+        state, detail = self._pending_mower_state
+        self._pending_mower_state = None
+        self._pending_mower_detail = None
+
+        self.entities[ENTITY_MOWER_STATE].state = state
+        self.entities[ENTITY_MOWER_STATE_DETAIL].state = detail
+
+        self.entities[ENTITY_MOWER_STATE].add_attributes({"last_updated": last_updated_now()})
+        self.entities[ENTITY_MOWER_STATE_DETAIL].add_attributes(
+            {
+                "last_updated": last_updated_now(),
+                "state_number": self._indego_client.state.state,
+                "state_description": detail,
+            }
+        )
+
+        self._last_state_ts = last_updated_now()
+
+    def _schedule_state_update(self, state: str, detail: str) -> None:
+        """Schedule a debounced mower state update."""
+        self._pending_mower_state = state
+        self._pending_mower_detail = detail
+        if self._debounce_remover is not None:
+            self._debounce_remover()
+        self._debounce_remover = async_call_later(
+            self._hass, STATE_DEBOUNCE_SECONDS, self._apply_pending_state
+        )
+
     def _warn_once(self, msg: str, *args) -> None:
         """Log a warning only if more than 60 seconds passed since last time."""
         key = msg % args if args else msg
@@ -1118,8 +1158,7 @@ class IndegoHub:
         xpos = getattr(state, "svg_xPos", None)
         ypos = getattr(state, "svg_yPos", None)
         self._last_state = mower_state
-        if mower_state != "unknown":
-            self._last_state_ts = last_updated_now()
+
 
         if self._adaptive_updates:
             desired_interval = 60 if mower_state == "docked" else self._position_interval
@@ -1218,6 +1257,33 @@ class IndegoHub:
     def set_online_state(self, online: bool):
         _LOGGER.debug("Set online state: %s", online)
 
+        if online:
+            self._offline_since = None
+            self._offline_failures = 0
+        else:
+            now = time.monotonic()
+            if self._offline_since is None:
+                self._offline_since = now
+            self._offline_failures += 1
+            if (
+                self._offline_failures < 2
+                and now - self._offline_since < OFFLINE_GRACE_PERIOD
+            ):
+                _LOGGER.debug(
+                    "Suppressing transient offline state (%s fails)",
+                    self._offline_failures,
+                )
+                return
+            if self._debounce_remover is not None:
+                self._debounce_remover()
+                self._debounce_remover = None
+                self._pending_mower_state = None
+                self._pending_mower_detail = None
+
+        if self._online == online:
+            return
+
+        self._online = online
         self.entities[ENTITY_ONLINE].state = online
         self.entities[ENTITY_MOWER_STATE].set_cloud_connection_state(online)
         self.entities[ENTITY_MOWER_STATE_DETAIL].set_cloud_connection_state(online)
@@ -1321,8 +1387,6 @@ class IndegoHub:
         new_y = self._indego_client.state.svg_yPos
         mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
 
-        if mower_state != "unknown":
-            self._last_state_ts = last_updated_now()
 
         if new_x is not None and new_y is not None:
             for entity in self.entities.values():
@@ -1330,26 +1394,14 @@ class IndegoHub:
                     await entity.refresh_map(mower_state)
         
         self.set_online_state(self._indego_client.online)
-        self.entities[ENTITY_MOWER_STATE].state = self._indego_client.state_description
-        self.entities[ENTITY_MOWER_STATE_DETAIL].state = self._indego_client.state_description_detail
+        self._schedule_state_update(
+            self._indego_client.state_description,
+            self._indego_client.state_description_detail,
+        )
         self.entities[ENTITY_LAWN_MOWED].state = self._indego_client.state.mowed
         self.entities[ENTITY_RUNTIME].state = self._indego_client.state.runtime.total.cut
         self.entities[ENTITY_BATTERY].charging = (
             True if self._indego_client.state_description_detail == "Charging" else False
-        )
-
-        self.entities[ENTITY_MOWER_STATE].add_attributes(
-            {
-                "last_updated": last_updated_now()
-            }
-        )
-
-        self.entities[ENTITY_MOWER_STATE_DETAIL].add_attributes(
-            {
-                "last_updated": last_updated_now(),
-                "state_number": self._indego_client.state.state,
-                "state_description": self._indego_client.state_description_detail,
-            }
         )
 
         self.entities[ENTITY_LAWN_MOWED].add_attributes(
