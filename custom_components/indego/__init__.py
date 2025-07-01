@@ -825,7 +825,7 @@ class IndegoHub:
             self._unsub_refresh_state = async_track_point_in_time(self._hass, self._create_refresh_state_task, when)
             return
 
-        if self._indego_client.state:
+        if self._indego_client.state is not None:
             state = self._indego_client.state.state
             if (500 <= state <= 799) or (state in (257, 260)):
                 try:
@@ -1312,7 +1312,7 @@ class IndegoHub:
         if self._shutdown:
             return
 
-        if not self._indego_client.state:
+        if self._indego_client.state is None:
             self.set_online_state(False)
             return  # State update failed
 
