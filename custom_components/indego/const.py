@@ -44,7 +44,6 @@ SERVICE_NAME_DELETE_ALERT: Final = "delete_alert"
 SERVICE_NAME_READ_ALERT: Final = "read_alert"
 SERVICE_NAME_DELETE_ALERT_ALL: Final = "delete_alert_all"
 SERVICE_NAME_READ_ALERT_ALL: Final = "read_alert_all"
-SERVICE_NAME_DOWNLOAD_MAP: Final = "download_map"
 SERVICE_NAME_REFRESH: Final = "refresh"
 SERVER_DATA_ALERT_INDEX: Final = "alert_index"
 
@@ -53,7 +52,8 @@ SENSOR_TYPE: Final = "sensor"
 BINARY_SENSOR_TYPE: Final = "binary_sensor"
 VACUUM_TYPE: Final = "vacuum"
 LAWN_MOWER_TYPE: Final = "lawn_mower"
-INDEGO_PLATFORMS: Final = [SENSOR_TYPE, BINARY_SENSOR_TYPE, VACUUM_TYPE, LAWN_MOWER_TYPE, CAMERA_TYPE]
+# Camera functionality is disabled in the nomap branch
+INDEGO_PLATFORMS: Final = [SENSOR_TYPE, BINARY_SENSOR_TYPE, VACUUM_TYPE, LAWN_MOWER_TYPE]
 
 ENTITY_ONLINE: Final = "online"
 ENTITY_UPDATE_AVAILABLE: Final = "update_available"

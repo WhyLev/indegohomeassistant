@@ -54,15 +54,6 @@ read_alert_all:
       description: Mower serial. Only needed when you have configured multiple mowers.
       example: '"YOUR_SERIALNUMBER"'
       required: false
-download_map:
-  description: >-
-    Download the current map from the Bosch API and save it to
-    `www/indego_map_SERIALNUMBER.svg`.
-  fields:
-    mower_serial:
-      description: Serial number of the mower for which the map should be downloaded.
-      example: '"YOUR_SERIALNUMBER"'
-      required: true
 refresh:
   description: Trigger an immediate data refresh if no cooldown is active.
   fields:

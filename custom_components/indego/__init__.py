@@ -38,15 +38,12 @@ from homeassistant.helpers.config_entry_oauth2_flow import async_get_config_entr
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.event import async_track_time_interval
 from pyIndego import IndegoAsyncClient
-from svgutils.transform import fromstring
-
 from .api import IndegoOAuth2Session
 from .binary_sensor import IndegoBinarySensor
 from .vacuum import IndegoVacuum
 from .lawn_mower import IndegoLawnMower
 from .const import *
 from .sensor import IndegoSensor
-from .camera import IndegoCamera, IndegoMapCamera
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -78,9 +75,6 @@ SERVICE_SCHEMA_READ_ALERT_ALL = vol.Schema({
     vol.Optional(CONF_MOWER_SERIAL): cv.string
 })
 
-SERVICE_SCHEMA_DOWNLOAD_MAP = vol.Schema({
-    vol.Required(CONF_MOWER_SERIAL): cv.string
-})
 
 SERVICE_SCHEMA_REFRESH = vol.Schema({
     vol.Optional(CONF_MOWER_SERIAL): cv.string
@@ -315,12 +309,6 @@ ENTITY_DEFINITIONS = {
         CONF_UNIT_OF_MEASUREMENT: None,
         CONF_ATTR: [],
     },
-    ENTITY_CAMERA: {
-        CONF_TYPE: CAMERA_TYPE,
-    },
-    ENTITY_CAMERA_PROGRESS: {
-        CONF_TYPE: CAMERA_TYPE,
-    },
 }
 
 
@@ -359,7 +347,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.options.get(CONF_LONGPOLL_TIMEOUT, DEFAULT_LONGPOLL_TIMEOUT)
     )
 
-    await indego_hub.start_periodic_position_update()
+    _LOGGER.info("Indego integration running in 'nomap' mode - map features disabled")
+
+
 
     async def load_platforms():
         _LOGGER.debug("Loading platforms")
@@ -451,11 +441,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await instance._indego_client.put_all_alerts_read()
         await instance._update_alerts()
 
-    async def async_download_map(call):
-        """Handle the download_map service call."""
-        instance = find_instance_for_mower_service_call(call)
-        _LOGGER.debug("Indego.download_map service called for serial: %s", instance.serial)
-        await instance.download_and_store_map()
 
     async def async_refresh(call):
         """Handle the refresh service call."""
@@ -511,12 +496,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             SERVICE_NAME_READ_ALERT_ALL, 
             async_read_alert_all, 
             schema=SERVICE_SCHEMA_READ_ALERT_ALL
-        )
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_NAME_DOWNLOAD_MAP,
-            async_download_map,
-            schema=SERVICE_SCHEMA_DOWNLOAD_MAP
         )
 
         hass.services.async_register(
@@ -691,21 +670,6 @@ class IndegoHub:
                         self
                     )
 
-            elif entity[CONF_TYPE] == CAMERA_TYPE:
-                if entity_key == ENTITY_CAMERA:
-                    self.entities[entity_key] = IndegoMapCamera(
-                        "indego",
-                        self._mower_name,
-                        device_info,
-                        self,
-                    )
-                else:
-                    self.entities[entity_key] = IndegoCamera(
-                        "indego_progress",
-                        self._mower_name,
-                        device_info,
-                        self,
-                    )
 
     async def update_generic_data_and_load_platforms(self, load_platforms):
         """Update the generic mower data, so we can create the HA platforms for the Indego component."""
@@ -1006,176 +970,18 @@ class IndegoHub:
         return f"/config/www/indego_map_{self._serial}.svg"
 
     async def download_and_store_map(self) -> None:
-        """Download the current map from the mower and save it locally."""
-        try:
-            svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
-            if svg_bytes:
-                path = self.map_path()
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                try:
-                    async with aiofiles.open(path, "wb") as f:
-                        await f.write(svg_bytes)
-                    _LOGGER.info("Map saved in %s", path)
-                except OSError as exc:
-                    self._warn_once(
-                        "Error during saving the map [%s]: %s", self._serial, exc
-                    )
-        except ClientResponseError as exc:
-            _LOGGER.warning(
-                "Map download for %s failed: HTTP %s - %s",
-                self._serial,
-                exc.status,
-                exc.message,
-            )
-        except Exception as e:  # noqa: BLE001
-            self._warn_once("Error during saving the map [%s]: %s", self._serial, e)
+        """Map download is disabled in the nomap branch."""
+        _LOGGER.debug("Map download skipped for %s (nomap mode)", self._serial)
 
     async def start_periodic_position_update(self, interval: int | None = None):
+        """Map updates are disabled in the nomap branch."""
         if interval is None:
             interval = self._position_interval
-
-        if self._unsub_map_timer:
-            self._unsub_map_timer()
-
         self._current_position_interval = interval
-        self._unsub_map_timer = async_track_time_interval(
-            self._hass, self._check_position_and_state, timedelta(seconds=interval)
-        )
 
     async def _check_position_and_state(self, now):
-        delays = [0, 1, 2, 4, 8]
-        if self._in_cooldown():
-            _LOGGER.debug(
-                "Skipping position update for %s due to cooldown", self._serial
-            )
-            return
-        delays = [0, 1, 2, 4]
-        for attempt, delay in enumerate(delays, 1):
-            if delay:
-                await asyncio.sleep(delay)
-            try:
-                await asyncio.wait_for(
-                    self._indego_client.update_state(
-                        force=True, longpoll_timeout=self._longpoll_timeout
-                    ),
-                    timeout=self._state_update_timeout,
-                )
-                break
-            except ClientResponseError as exc:
-                if exc.status in (502, 429) and attempt < len(delays):
-                    if exc.status == 429:
-                        self._handle_rate_limit(exc)
-                        return
-                    if exc.status == 502:
-                        if attempt == len(delays):
-                            self._log_api_error(
-                                "502",
-                                "Failed to update state for %s due to HTTP 502" % self._serial,
-                                exc,
-                            )
-                            return
-                        continue
-                if exc.status == 429:
-                    self._log_api_error(
-                        "429",
-                        "Failed to update state for %s due to HTTP 429" % self._serial,
-                        exc,
-                    )
-                    return
-                self._api_error_count += 1
-                self.entities[ENTITY_API_ERRORS].state = self._api_error_count
-                _LOGGER.warning(
-                    "Failed to update state for %s due to HTTP %s",
-                    self._serial,
-                    exc.status,
-                )
-                return
-            except asyncio.TimeoutError:
-                self._log_api_error("timeout", "Timeout on update_state() for %s – mower not available or too slow" % self._serial)
-                return
-            except Exception as exc:
-                self._log_api_error("other", "Error on update_state() for %s – actual mower_state=%s" % (self._serial, self._last_state), exc)
-                return
-        try:
-            await asyncio.wait_for(
-                self._indego_client.update_state(
-                    force=True, longpoll_timeout=self._longpoll_timeout
-                ),
-                timeout=self._state_update_timeout,
-            )
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
-        except asyncio.TimeoutError:
-            self._log_api_error(
-                "timeout",
-                "Timeout on update_state() for %s – mower not available or too slow" % self._serial,
-            )
-            return
-        except Exception as e:
-            self._log_api_error(
-                "other",
-                "Error on update_state() for %s – actual mower_state=%s" % (self._serial, self._last_state),
-                e,
-            )
-            return
-
-        state = self._indego_client.state
-        if not state:
-            self._warn_once("Received invalid state from mower")
-            return
-
-        mower_state = getattr(state, "mower_state", "unknown")
-        if mower_state == "unknown":
-            if self._last_state_ts is None:
-                _LOGGER.debug(
-                    "Received unknown state for %s on initial update – refreshing",
-                    self._serial,
-                )
-            else:
-                _LOGGER.warning(
-                    "Received unknown state for %s, last success at %s – refreshing",
-                    self._serial,
-                    self._last_state_ts,
-                )
-            try:
-                await self._update_state(longpoll=False)
-            except Exception as exc:  # noqa: BLE001
-                self._log_api_error(
-                    "other",
-                    "Retrying state refresh failed for %s: %s" % (self._serial, exc),
-                    exc,
-                )
-                return
-            state = self._indego_client.state
-            if not state:
-                _LOGGER.warning("Received invalid state from mower after retry")
-                return
-            mower_state = getattr(state, "mower_state", "unknown")
-
-        xpos = getattr(state, "svg_xPos", None)
-        ypos = getattr(state, "svg_yPos", None)
-        self._last_state = mower_state
-
-
-        if self._adaptive_updates:
-            desired_interval = 60 if mower_state == "docked" else self._position_interval
-            if desired_interval != self._current_position_interval:
-                await self.start_periodic_position_update(desired_interval)
-
-        if mower_state == "docked":
-            _LOGGER.debug("Mower is docked - no position updates")
-            return
-
-        if xpos is not None and ypos is not None:
-            if (xpos, ypos) != self._last_position:
-                _LOGGER.info("Position changed: x=%s, y=%s", xpos, ypos)
-                self._last_position = (xpos, ypos)
-                for entity in self.entities.values():
-                    if hasattr(entity, "refresh_map"):
-                        await entity.refresh_map(mower_state)
+        """Position updates are disabled in the nomap branch."""
+        return
     
     async def _update_operating_data(self):
         if self._in_cooldown():
@@ -1382,16 +1188,7 @@ class IndegoHub:
             self.set_online_state(False)
             return  # State update failed
 
-        # Refresh Camera map if Position is available
-        new_x = self._indego_client.state.svg_xPos
-        new_y = self._indego_client.state.svg_yPos
-        mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
 
-
-        if new_x is not None and new_y is not None:
-            for entity in self.entities.values():
-                if hasattr(entity, "refresh_map"):
-                    await entity.refresh_map(mower_state)
         
         self.set_online_state(self._indego_client.online)
         self._schedule_state_update(
