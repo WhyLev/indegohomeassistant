@@ -842,7 +842,8 @@ class IndegoHub:
         if self._pending_mower_state is None:
             return
 
-        state, detail = self._pending_mower_state
+        state = self._pending_mower_state
+        detail = self._pending_mower_detail
         self._pending_mower_state = None
         self._pending_mower_detail = None
 

@@ -11,9 +11,7 @@
                 "data": {
                     "user_agent": "User-Agent",
                     "expose_mower": "Voeg de Indego robotmaaier toe als grasmaaier entiteit aan HomeAssistant",
-                    "expose_vacuum": "Voeg de Indego robotmaaier toe als stofzuiger entiteit aan HomeAssistant",
-                    "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color"
+                    "expose_vacuum": "Voeg de Indego robotmaaier toe als stofzuiger entiteit aan HomeAssistant"
                 },
                 "description": "Geavanceerde instellingen van het Bosch Indego component."
             },
@@ -31,22 +29,20 @@
         }
     },
     "options": {
-      "step": {
-          "init": {
-              "title": "Geavanceerde instellingen",
-              "description": "Geavanceerde instellingen van het Bosch Indego component. Mogelijk moet het component opnieuw geladen worden na het wijzigen van deze instellingen.",
-              "data": {
-                  "user_agent": "User-Agent",
-                  "expose_mower": "Voeg de Indego robotmaaier toe als grasmaaier entiteit aan HomeAssistant",
-                  "expose_vacuum": "Voeg de Indego robotmaaier toe als stofzuiger entiteit aan HomeAssistant",
-                  "show_all_alerts": "Toon de volledige melding/waarschuwing geschiedenis in HomeAssistant. Dit wordt niet aangeraden voor de meeste gebruikers, het heeft mogelijk een significante impact op de HomeAssistant database!",
-                  "progress_line_width": "Progress line width (px)",
-                  "progress_line_color": "Progress line color",
-                  "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
-                  "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
+        "step": {
+            "init": {
+                "title": "Geavanceerde instellingen",
+                "description": "Geavanceerde instellingen van het Bosch Indego component. Mogelijk moet het component opnieuw geladen worden na het wijzigen van deze instellingen.",
+                "data": {
+                    "user_agent": "User-Agent",
+                    "expose_mower": "Voeg de Indego robotmaaier toe als grasmaaier entiteit aan HomeAssistant",
+                    "expose_vacuum": "Voeg de Indego robotmaaier toe als stofzuiger entiteit aan HomeAssistant",
+                    "show_all_alerts": "Toon de volledige melding/waarschuwing geschiedenis in HomeAssistant. Dit wordt niet aangeraden voor de meeste gebruikers, het heeft mogelijk een significante impact op de HomeAssistant database!",
+                    "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
+                    "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
                 }
-          }
-      }
+            }
+        }
     },
     "entity": {
         "binary_sensor": {

@@ -13,9 +13,7 @@
                     "expose_mower": "Expose Indego mower as mower entity in HomeAssistant",
                     "expose_vacuum": "Expose Indego mower as vacuum entity in HomeAssistant",
                     "position_update_interval": "Position update interval (seconds)",
-                    "adaptive_position_updates": "Reduce polling when mower is docked",
-                    "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color"
+                    "adaptive_position_updates": "Reduce polling when mower is docked"
                 },
                 "description": "Advanced settings of the Bosch Indego component."
             },
@@ -33,24 +31,22 @@
         }
     },
     "options": {
-      "step": {
-          "init": {
-              "title": "Advanced settings",
-              "description": "Advanced settings of the Bosch Indego component. You might have to reload the component after changing these settings.",
-              "data": {
-                  "user_agent": "User-Agent",
-                  "expose_mower": "Expose Indego mower as mower entity in HomeAssistant",
-                  "expose_vacuum": "Expose Indego mower as vacuum entity in HomeAssistant",
+        "step": {
+            "init": {
+                "title": "Advanced settings",
+                "description": "Advanced settings of the Bosch Indego component. You might have to reload the component after changing these settings.",
+                "data": {
+                    "user_agent": "User-Agent",
+                    "expose_mower": "Expose Indego mower as mower entity in HomeAssistant",
+                    "expose_vacuum": "Expose Indego mower as vacuum entity in HomeAssistant",
                     "show_all_alerts": "Show the full alert history into HomeAssistant. This is not recommended for most users, it might have a significant impact on the HomeAssistant database size!",
                     "position_update_interval": "Position update interval (seconds)",
                     "adaptive_position_updates": "Reduce polling when mower is docked",
-                    "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color",
                     "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
                     "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
                 }
-          }
-      }
+            }
+        }
     },
     "entity": {
         "binary_sensor": {

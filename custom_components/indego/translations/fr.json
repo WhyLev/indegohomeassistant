@@ -1,52 +1,48 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Cette tondeuse Bosch Indego a déjà été configurée !",
-            "connection_error": "La connexion à l'API Bosch Indego a échoué ! Regardez la page des problèmes connus (https://github.com/WhyLev/indegohomeassistant/issues) pour trouver une solution éventuelle.",
-            "no_mowers_found": "Aucune tondeuse n'a été trouvée sur ce compte Bosch Indego !",
-            "reauth_successful": "Ré-authentication réussie. L'accès à l'API Bosch a été rétabli."
+            "already_configured": "Cette tondeuse Bosch Indego a d\u00e9j\u00e0 \u00e9t\u00e9 configur\u00e9e !",
+            "connection_error": "La connexion \u00e0 l'API Bosch Indego a \u00e9chou\u00e9 ! Regardez la page des probl\u00e8mes connus (https://github.com/WhyLev/indegohomeassistant/issues) pour trouver une solution \u00e9ventuelle.",
+            "no_mowers_found": "Aucune tondeuse n'a \u00e9t\u00e9 trouv\u00e9e sur ce compte Bosch Indego !",
+            "reauth_successful": "R\u00e9-authentication r\u00e9ussie. L'acc\u00e8s \u00e0 l'API Bosch a \u00e9t\u00e9 r\u00e9tabli."
         },
         "step": {
             "advanced": {
                 "data": {
                     "user_agent": "User-Agent",
-                    "expose_mower": "Exposer la tondeuse Indego comme une entité tondeuse dans HomeAssistant",
-                    "expose_vacuum": "Exposer la tondeuse Indego comme une entité aspirateur dans HomeAssistant",
-                    "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color"
+                    "expose_mower": "Exposer la tondeuse Indego comme une entit\u00e9 tondeuse dans HomeAssistant",
+                    "expose_vacuum": "Exposer la tondeuse Indego comme une entit\u00e9 aspirateur dans HomeAssistant"
                 },
-                "description": "Réglages avancés du composant Bosch Indego. Peuvent être laissés inchangés pour la plupart des utilisateurs."
+                "description": "R\u00e9glages avanc\u00e9s du composant Bosch Indego. Peuvent \u00eatre laiss\u00e9s inchang\u00e9s pour la plupart des utilisateurs."
             },
             "mower": {
                 "data": {
-                    "mower_serial": "Numéro de série de la tondeuse",
+                    "mower_serial": "Num\u00e9ro de s\u00e9rie de la tondeuse",
                     "mower_name": "Nom de la tondeuse"
                 },
-                "description": "Sélectionez le numéro de série de la tondeuse Bosch que vous souhaitez ajouter."
+                "description": "S\u00e9lectionez le num\u00e9ro de s\u00e9rie de la tondeuse Bosch que vous souhaitez ajouter."
             },
             "reauth_confirm": {
-                "title": "Authentication expirée",
-                "description": "L'authentification de l'API Bosch Indego a expiré. Re-authentifiez-vous avec votre Bosch SingleKey ID."
+                "title": "Authentication expir\u00e9e",
+                "description": "L'authentification de l'API Bosch Indego a expir\u00e9. Re-authentifiez-vous avec votre Bosch SingleKey ID."
             }
         }
     },
     "options": {
-      "step": {
-          "init": {
-              "title": "Réglages avancés",
-              "description": "Réglages avancés du composant Bosch Indego. Vous devrez recharger le composant après avoir changé ces paramètres.",
-              "data": {
-                  "user_agent": "User-Agent",
-                  "expose_mower": "Exposer la tondeuse Indego comme une entité tondeuse dans HomeAssistant",
-                  "expose_vacuum": "Exposer la tondeuse Indego comme une entité aspirateur dans HomeAssistant",
-                    "show_all_alerts": "Montrer l'historique complet des alertes dans HomeAssistant. Non recommandé pour la plupart des utilisateurs, l'impact sur la taille de la base de données HomeAssistant peut être assez important!",
-                    "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color",
+        "step": {
+            "init": {
+                "title": "R\u00e9glages avanc\u00e9s",
+                "description": "R\u00e9glages avanc\u00e9s du composant Bosch Indego. Vous devrez recharger le composant apr\u00e8s avoir chang\u00e9 ces param\u00e8tres.",
+                "data": {
+                    "user_agent": "User-Agent",
+                    "expose_mower": "Exposer la tondeuse Indego comme une entit\u00e9 tondeuse dans HomeAssistant",
+                    "expose_vacuum": "Exposer la tondeuse Indego comme une entit\u00e9 aspirateur dans HomeAssistant",
+                    "show_all_alerts": "Montrer l'historique complet des alertes dans HomeAssistant. Non recommand\u00e9 pour la plupart des utilisateurs, l'impact sur la taille de la base de donn\u00e9es HomeAssistant peut \u00eatre assez important!",
                     "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
                     "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
                 }
-          }
-      }
+            }
+        }
     },
     "entity": {
         "binary_sensor": {
@@ -56,16 +52,16 @@
                         "name": "Nombre d'alertes"
                     },
                     "last_alert_error_code": {
-                        "name": "Code erreur (plus récent)"
+                        "name": "Code erreur (plus r\u00e9cent)"
                     },
                     "last_alert_message": {
-                        "name": "Message d'alerte (plus récent)"
+                        "name": "Message d'alerte (plus r\u00e9cent)"
                     },
                     "last_alert_date": {
-                        "name": " Date de l'alerte (plus récent)"
+                        "name": " Date de l'alerte (plus r\u00e9cent)"
                     },
                     "last_alert_read": {
-                        "name": "Statut de l'alerte (plus récent)",
+                        "name": "Statut de l'alerte (plus r\u00e9cent)",
                         "state": {
                             "read": "Lues",
                             "unread": "Non lues"
@@ -89,7 +85,7 @@
                     "Reading status": "Obtention du statut en cours",
                     "Charging": "Charge en cours",
                     "Docked": "Dans station de charge",
-                    "Docked - Software update": "Dans station de charge - Mise à jour du logiciel",
+                    "Docked - Software update": "Dans station de charge - Mise \u00e0 jour du logiciel",
                     "Docked - Loading map": "Dans station de charge - Chargement carte",
                     "Docked - Saving map": "Dans station de charge - Enregistrement carte",
                     "Docked - Leaving Dock": "Dans station de charge - Quitte la station",
@@ -98,35 +94,35 @@
                     "Mowing - Learning Lawn": "Tonte en cours - Apprentissage de la pelouse",
                     "Mowing - Learning Lawn paused": "Tonte en cours - Apprentissage de la pelouse en pause",
                     "SpotMow": "SpotMow",
-                    "Mowing randomly": "Tonte aléatoire",
+                    "Mowing randomly": "Tonte al\u00e9atoire",
                     "Diagnostic mode": "Mode diagnostic",
                     "End of life": "Fin de vie",
-                    "Software update": "Mise à jour du logiciel",
-                    "Energy save mode": "Mode économie d'énergie",
+                    "Software update": "Mise \u00e0 jour du logiciel",
+                    "Energy save mode": "Mode \u00e9conomie d'\u00e9nergie",
                     "Relocalising": "Cherche position",
                     "Loading map": "Chargement carte",
                     "Learning lawn": "Apprentissage de la pelouse",
                     "Paused": "En pause",
                     "Border cut": "Tonte des bords",
-                    "Idle in lawn": "Immobilisée sur pelouse",
-                    "Stuck on lawn, help needed": "Bloquée sur pelouse, intervention nécessaire",
-                    "Returning to Dock": "Retour à la station",
-                    "Returning to Dock - Battery low": "Retour à la station - Batterie faible",
-                    "Returning to dock - Calendar timeslot ended": "Retour à la station - Fin de créneau agenda",
-                    "Returning to dock - Battery temp range": "Retour à la station - Température batterie hors tolérances",
-                    "Returning to dock - Lawn complete": "Retour à la station - Pelouse terminée",
-                    "Returning to dock - Relocalising": "Retour à la station - Cherche position",
-                    "Returning to dock - requested by user/app": "Retour à la station - Demandé par l'utilisateur"
+                    "Idle in lawn": "Immobilis\u00e9e sur pelouse",
+                    "Stuck on lawn, help needed": "Bloqu\u00e9e sur pelouse, intervention n\u00e9cessaire",
+                    "Returning to Dock": "Retour \u00e0 la station",
+                    "Returning to Dock - Battery low": "Retour \u00e0 la station - Batterie faible",
+                    "Returning to dock - Calendar timeslot ended": "Retour \u00e0 la station - Fin de cr\u00e9neau agenda",
+                    "Returning to dock - Battery temp range": "Retour \u00e0 la station - Temp\u00e9rature batterie hors tol\u00e9rances",
+                    "Returning to dock - Lawn complete": "Retour \u00e0 la station - Pelouse termin\u00e9e",
+                    "Returning to dock - Relocalising": "Retour \u00e0 la station - Cherche position",
+                    "Returning to dock - requested by user/app": "Retour \u00e0 la station - Demand\u00e9 par l'utilisateur"
                 }
             }
         }
     },
     "services": {
         "command": {
-            "description": "Envoyer des commandes à la tondeuse. Les commandes autorisées sont mow (tondre), returnToDock (retour à la station de charge) et pause.",
+            "description": "Envoyer des commandes \u00e0 la tondeuse. Les commandes autoris\u00e9es sont mow (tondre), returnToDock (retour \u00e0 la station de charge) et pause.",
             "fields": {
                 "mower_serial": {
-                    "description": "Numéro de série de la tondeuse. Uniquement nécessaire si vous avez configuré plusieurs tondeuses."
+                    "description": "Num\u00e9ro de s\u00e9rie de la tondeuse. Uniquement n\u00e9cessaire si vous avez configur\u00e9 plusieurs tondeuses."
                 },
                 "command": {
                     "description": "Commande pour la tondeuse."
@@ -134,10 +130,10 @@
             }
         },
         "smartmowing": {
-            "description": "Activer ou Désactiver le SmartMowing. Les commandes autorisées sont true (activé) ou false (déactivé).",
+            "description": "Activer ou D\u00e9sactiver le SmartMowing. Les commandes autoris\u00e9es sont true (activ\u00e9) ou false (d\u00e9activ\u00e9).",
             "fields": {
                 "mower_serial": {
-                    "description": "Numéro de série de la tondeuse. Uniquement nécessaire si vous avez configuré plusieurs tondeuses."
+                    "description": "Num\u00e9ro de s\u00e9rie de la tondeuse. Uniquement n\u00e9cessaire si vous avez configur\u00e9 plusieurs tondeuses."
                 },
                 "enable": {
                     "description": "Activer SmartMowing."
@@ -145,13 +141,13 @@
             }
         },
         "delete_alert": {
-            "description": "Effacer l'alerte sélectionnée.",
+            "description": "Effacer l'alerte s\u00e9lectionn\u00e9e.",
             "fields": {
                 "mower_serial": {
-                    "description": "Numéro de série de la tondeuse. Uniquement nécessaire si vous avez configuré plusieurs tondeuses."
+                    "description": "Num\u00e9ro de s\u00e9rie de la tondeuse. Uniquement n\u00e9cessaire si vous avez configur\u00e9 plusieurs tondeuses."
                 },
                 "alert_index": {
-                    "description": "Effacer l'alerte sélectionnée. 0 pour la dernière alerte."
+                    "description": "Effacer l'alerte s\u00e9lectionn\u00e9e. 0 pour la derni\u00e8re alerte."
                 }
             }
         },
@@ -159,18 +155,18 @@
             "description": "Effacer toutes les alertes.",
             "fields": {
                 "mower_serial": {
-                    "description": "Numéro de série de la tondeuse. Uniquement nécessaire si vous avez configuré plusieurs tondeuses."
+                    "description": "Num\u00e9ro de s\u00e9rie de la tondeuse. Uniquement n\u00e9cessaire si vous avez configur\u00e9 plusieurs tondeuses."
                 }
             }
         },
         "read_alert": {
-            "description": "Marquer l'alerte sélectionnée comme lue.",
+            "description": "Marquer l'alerte s\u00e9lectionn\u00e9e comme lue.",
             "fields": {
                 "mower_serial": {
-                    "description": "Numéro de série de la tondeuse. Uniquement nécessaire si vous avez configuré plusieurs tondeuses."
+                    "description": "Num\u00e9ro de s\u00e9rie de la tondeuse. Uniquement n\u00e9cessaire si vous avez configur\u00e9 plusieurs tondeuses."
                 },
                 "alert_index": {
-                    "description": "Marquer l'alerte sélectionnée comme lue. 0 pour la dernière alerte."
+                    "description": "Marquer l'alerte s\u00e9lectionn\u00e9e comme lue. 0 pour la derni\u00e8re alerte."
                 }
             }
         },
@@ -178,7 +174,7 @@
             "description": "Marquer toutes les alertes comme lues.",
             "fields": {
                 "mower_serial": {
-                    "description": "Numéro de série de la tondeuse. Uniquement nécessaire si vous avez configuré plusieurs tondeuses."
+                    "description": "Num\u00e9ro de s\u00e9rie de la tondeuse. Uniquement n\u00e9cessaire si vous avez configur\u00e9 plusieurs tondeuses."
                 }
             }
         }
