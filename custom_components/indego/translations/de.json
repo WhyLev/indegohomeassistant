@@ -1,30 +1,28 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Dieser Bosch Indego Mähroboter wurde bereits konfiguriert!",
-            "connection_error": "Die Verbindung zur Bosch Indego API ist fehlgeschlagen! Bitte die Known Issues Seite (https://github.com/WhyLev/indegohomeassistant/issues) für mögliche Lösungen nutzen.",
-            "no_mowers_found": "In diesem Bosch Indego Account wurden keine Mähroboter gefunden!",
+            "already_configured": "Dieser Bosch Indego M\u00e4hroboter wurde bereits konfiguriert!",
+            "connection_error": "Die Verbindung zur Bosch Indego API ist fehlgeschlagen! Bitte die Known Issues Seite (https://github.com/WhyLev/indegohomeassistant/issues) f\u00fcr m\u00f6gliche L\u00f6sungen nutzen.",
+            "no_mowers_found": "In diesem Bosch Indego Account wurden keine M\u00e4hroboter gefunden!",
             "reauth_successful": "Re-Authentifizierung war erfolgreich. Zugang zur Bosch API wurde wiederhergestellt."
         },
         "step": {
             "advanced": {
                 "data": {
                     "user_agent": "User-Agent",
-                    "expose_mower": "Indego Mähroboter als Mower Entität in HomeAssistant anlegen",
-                    "expose_vacuum": "Indego Mähroboter als Vacuum Entität in HomeAssistant anlegen",
+                    "expose_mower": "Indego M\u00e4hroboter als Mower Entit\u00e4t in HomeAssistant anlegen",
+                    "expose_vacuum": "Indego M\u00e4hroboter als Vacuum Entit\u00e4t in HomeAssistant anlegen",
                     "position_update_interval": "Positionsaktualisierungsintervall (Sekunden)",
-                    "adaptive_position_updates": "Abfrage verringern, wenn Mäher angedockt"
-        , "progress_line_width": "Progress line width (px)"
-        , "progress_line_color": "Progress line color"
+                    "adaptive_position_updates": "Abfrage verringern, wenn M\u00e4her angedockt"
                 },
                 "description": "Erweiterte Einstellung des Bosch Indego Component."
             },
             "mower": {
                 "data": {
-                    "mower_serial": "Mähroboter Seriennummer",
-                    "mower_name": "Mähroboter Name"
+                    "mower_serial": "M\u00e4hroboter Seriennummer",
+                    "mower_name": "M\u00e4hroboter Name"
                 },
-                "description": "Bitte die Seriennummer des Bosch Mähroboters, der hinzugefügt werden soll, auswählen."
+                "description": "Bitte die Seriennummer des Bosch M\u00e4hroboters, der hinzugef\u00fcgt werden soll, ausw\u00e4hlen."
             },
             "reauth_confirm": {
                 "title": "Authentifizierung abgelaufen",
@@ -39,16 +37,14 @@
                 "description": "Erweiterte Einstellung des Bosch Indego Component.",
                 "data": {
                     "user_agent": "User-Agent",
-                    "expose_mower": "Indego Mähroboter als Mower Entität in HomeAssistant anlegen",
-                    "expose_vacuum": "Indego Mähroboter als Vacuum Entität in HomeAssistant anlegen",
-                    "show_all_alerts": "Zeige den kompletten Alarm Verlauf in HomeAssistant. Dies wird für die meisten Nutzer nicht empfohlen, da es signifikanten Einfluss auf die Größe der HomeAssistant Datenbank haben kann.",
+                    "expose_mower": "Indego M\u00e4hroboter als Mower Entit\u00e4t in HomeAssistant anlegen",
+                    "expose_vacuum": "Indego M\u00e4hroboter als Vacuum Entit\u00e4t in HomeAssistant anlegen",
+                    "show_all_alerts": "Zeige den kompletten Alarm Verlauf in HomeAssistant. Dies wird f\u00fcr die meisten Nutzer nicht empfohlen, da es signifikanten Einfluss auf die Gr\u00f6\u00dfe der HomeAssistant Datenbank haben kann.",
                     "position_update_interval": "Positionsaktualisierungsintervall (Sekunden)",
-                    "adaptive_position_updates": "Abfrage verringern, wenn Mäher angedockt"
-        , "progress_line_width": "Progress line width (px)"
-        , "progress_line_color": "Progress line color"
-        , "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)"
-        , "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
-                  }
+                    "adaptive_position_updates": "Abfrage verringern, wenn M\u00e4her angedockt",
+                    "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
+                    "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
+                }
             }
         }
     },
@@ -81,29 +77,28 @@
         "sensor": {
             "mower_state": {
                 "state": {
-                    "Mowing": "Mähen",
+                    "Mowing": "M\u00e4hen",
                     "Docked": "Angedockt",
-                    "Sleeping": "Schläft",
+                    "Sleeping": "Schl\u00e4ft",
                     "Paused": "Pausiert"
                 }
             },
             "mower_state_detail": {
                 "state": {
-                    "Sleeping": "Schläft",
+                    "Sleeping": "Schl\u00e4ft",
                     "Reading status": "Status abrufen",
                     "Charging": "Laden",
                     "Docked": "Angedockt",
-                    "Sleeping": "Schläft",
                     "Docked - Software update": "Angedockt - Software Update",
                     "Docked - Loading map": "Angedockt - Karte laden",
                     "Docked - Saving map": "Angedockt - Karte speichern",
-                    "Docked - Leaving Dock": "Angedockt - Verlässt Ladestation",
-                    "Mowing": "Mähen",
-                    "Mowing - Relocalising": "Mähen - Position bestimmen",
-                    "Mowing - Learning Lawn": "Mähen - Karte lernen",
-                    "Mowing - Learning Lawn paused": "Mähen - Karte lernen pausiert",
+                    "Docked - Leaving Dock": "Angedockt - Verl\u00e4sst Ladestation",
+                    "Mowing": "M\u00e4hen",
+                    "Mowing - Relocalising": "M\u00e4hen - Position bestimmen",
+                    "Mowing - Learning Lawn": "M\u00e4hen - Karte lernen",
+                    "Mowing - Learning Lawn paused": "M\u00e4hen - Karte lernen pausiert",
                     "SpotMow": "SpotMow",
-                    "Mowing randomly": "Zufälliges Mähen",
+                    "Mowing randomly": "Zuf\u00e4lliges M\u00e4hen",
                     "Diagnostic mode": "Diagnose Modus",
                     "End of life": "Lebensende",
                     "Software update": "Software Update",
@@ -112,37 +107,37 @@
                     "Loading map": "Karte laden",
                     "Learning lawn": "Karte lernen",
                     "Paused": "Pausiert",
-                    "Border cut": "Kantenmähen",
+                    "Border cut": "Kantenm\u00e4hen",
                     "Idle in lawn": "Leerlauf",
-                    "Stuck on lawn, help needed": "Festgefahren, Hilfe nötig",
-                    "Returning to Dock": "Zurück zur Ladestation",
-                    "Returning to Dock - Battery low": "Zurück zur Ladestation - Batteriestand niedrig",
-                    "Returning to dock - Calendar timeslot ended": "Zurück zur Ladestation - Kalender Zeitfenser zu Ende",
-                    "Returning to dock - Battery temp range": "Zurück zur Ladestation - Batterie Temperaturfenster",
-                    "Returning to dock - Lawn complete": "Zurück zur Ladestation - Rasen vollständig gemäht",
-                    "Returning to dock - Relocalising": "Zurück zur Ladestation - Position bestimmen",
-                    "Returning to dock - requested by user/app": "Zurück zur Ladestation - Angefordert vom Benutzer"
+                    "Stuck on lawn, help needed": "Festgefahren, Hilfe n\u00f6tig",
+                    "Returning to Dock": "Zur\u00fcck zur Ladestation",
+                    "Returning to Dock - Battery low": "Zur\u00fcck zur Ladestation - Batteriestand niedrig",
+                    "Returning to dock - Calendar timeslot ended": "Zur\u00fcck zur Ladestation - Kalender Zeitfenser zu Ende",
+                    "Returning to dock - Battery temp range": "Zur\u00fcck zur Ladestation - Batterie Temperaturfenster",
+                    "Returning to dock - Lawn complete": "Zur\u00fcck zur Ladestation - Rasen vollst\u00e4ndig gem\u00e4ht",
+                    "Returning to dock - Relocalising": "Zur\u00fcck zur Ladestation - Position bestimmen",
+                    "Returning to dock - requested by user/app": "Zur\u00fcck zur Ladestation - Angefordert vom Benutzer"
                 }
             }
         }
     },
     "services": {
         "command": {
-            "description": "Befehle an den Mähroboter senden. Möglich Befehle sind mow, returnToDock und pause.",
+            "description": "Befehle an den M\u00e4hroboter senden. M\u00f6glich Befehle sind mow, returnToDock und pause.",
             "fields": {
                 "mower_serial": {
-                    "description": "Seriennummer des Mähroboters. Wird nur benötigt, wenn mehrere Mähroboter eingerichtet sind."
+                    "description": "Seriennummer des M\u00e4hroboters. Wird nur ben\u00f6tigt, wenn mehrere M\u00e4hroboter eingerichtet sind."
                 },
                 "command": {
-                    "description": "Befehl für den Mähroboter."
+                    "description": "Befehl f\u00fcr den M\u00e4hroboter."
                 }
             }
         },
         "smartmowing": {
-            "description": "SmartMowing aktivieren oder deaktivieren. Mögliche Befehle sind true oder false.",
+            "description": "SmartMowing aktivieren oder deaktivieren. M\u00f6gliche Befehle sind true oder false.",
             "fields": {
                 "mower_serial": {
-                    "description": "Seriennummer des Mähroboters. Wird nur benötigt, wenn mehrere Mähroboter eingerichtet sind."
+                    "description": "Seriennummer des M\u00e4hroboters. Wird nur ben\u00f6tigt, wenn mehrere M\u00e4hroboter eingerichtet sind."
                 },
                 "enable": {
                     "description": "SmartMowing aktivieren."
@@ -150,32 +145,32 @@
             }
         },
         "delete_alert": {
-            "description": "Löscht den ausgewählten Fehler.",
+            "description": "L\u00f6scht den ausgew\u00e4hlten Fehler.",
             "fields": {
                 "mower_serial": {
-                    "description": "Seriennummer des Mähroboters. Wird nur benötigt, wenn mehrere Mähroboter eingerichtet sind."
+                    "description": "Seriennummer des M\u00e4hroboters. Wird nur ben\u00f6tigt, wenn mehrere M\u00e4hroboter eingerichtet sind."
                 },
                 "alert_index": {
-                    "description": "Den ausgewählten Fehler löschen. Mit 0 wird der letzte/aktuellste Fehler gelöscht."
+                    "description": "Den ausgew\u00e4hlten Fehler l\u00f6schen. Mit 0 wird der letzte/aktuellste Fehler gel\u00f6scht."
                 }
             }
         },
         "delete_alert_all": {
-            "description": "Löscht alle Fehler.",
+            "description": "L\u00f6scht alle Fehler.",
             "fields": {
                 "mower_serial": {
-                    "description": "Seriennummer des Mähroboters. Wird nur benötigt, wenn mehrere Mähroboter eingerichtet sind."
+                    "description": "Seriennummer des M\u00e4hroboters. Wird nur ben\u00f6tigt, wenn mehrere M\u00e4hroboter eingerichtet sind."
                 }
             }
         },
         "read_alert": {
-            "description": "Markiert den ausgewählten Fehler als gelesen.",
+            "description": "Markiert den ausgew\u00e4hlten Fehler als gelesen.",
             "fields": {
                 "mower_serial": {
-                    "description": "Seriennummer des Mähroboters. Wird nur benötigt, wenn mehrere Mähroboter eingerichtet sind."
+                    "description": "Seriennummer des M\u00e4hroboters. Wird nur ben\u00f6tigt, wenn mehrere M\u00e4hroboter eingerichtet sind."
                 },
                 "alert_index": {
-                    "description": "Den ausgewählten Fehler als gelesen markieren. Mit 0 wird der letzte/aktuellste Fehler ausgewählt."
+                    "description": "Den ausgew\u00e4hlten Fehler als gelesen markieren. Mit 0 wird der letzte/aktuellste Fehler ausgew\u00e4hlt."
                 }
             }
         },
@@ -183,7 +178,7 @@
             "description": "Markiert alle Fehler als gelesen.",
             "fields": {
                 "mower_serial": {
-                    "description": "Seriennummer des Mähroboters. Wird nur benötigt, wenn mehrere Mähroboter eingerichtet sind."
+                    "description": "Seriennummer des M\u00e4hroboters. Wird nur ben\u00f6tigt, wenn mehrere M\u00e4hroboter eingerichtet sind."
                 }
             }
         }

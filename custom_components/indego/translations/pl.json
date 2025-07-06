@@ -1,18 +1,16 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Ta kosiarka Bosch Indego została już wcześniej skonfigurowana!",
-            "connection_error": "Błąd połączenia z Bosch Indego API! Please use the known issues page (https://github.com/WhyLev/indegohomeassistant/issues) for possible solutions.",
-            "no_mowers_found": "Na tym koncie Bosch Indego nie znaleziono żadnej kosiarki!"
+            "already_configured": "Ta kosiarka Bosch Indego zosta\u0142a ju\u017c wcze\u015bniej skonfigurowana!",
+            "connection_error": "B\u0142\u0105d po\u0142\u0105czenia z Bosch Indego API! Please use the known issues page (https://github.com/WhyLev/indegohomeassistant/issues) for possible solutions.",
+            "no_mowers_found": "Na tym koncie Bosch Indego nie znaleziono \u017cadnej kosiarki!"
         },
         "step": {
             "advanced": {
                 "data": {
                     "user_agent": "User-Agent",
-                    "expose_mower": "Wyświetl kosiarkę Indego jako encję kosiarki w HomeAssistant",
-                    "expose_vacuum": "Wyświetl kosiarkę Indego jako encję odkurzacza w HomeAssistant",
-                    "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color"
+                    "expose_mower": "Wy\u015bwietl kosiark\u0119 Indego jako encj\u0119 kosiarki w HomeAssistant",
+                    "expose_vacuum": "Wy\u015bwietl kosiark\u0119 Indego jako encj\u0119 odkurzacza w HomeAssistant"
                 },
                 "description": "Ustawienia zaawansowane komponentu Bosch Indego."
             },
@@ -21,40 +19,38 @@
                     "mower_serial": "Numer seryjny kosiarki",
                     "mower_name": "Nazwa kosiarki"
                 },
-                "description": "Proszę wybrać numer seryjny kosiarki Bosch którą chcesz dodać."
+                "description": "Prosz\u0119 wybra\u0107 numer seryjny kosiarki Bosch kt\u00f3r\u0105 chcesz doda\u0107."
             }
         }
     },
     "options": {
-      "step": {
-          "init": {
-              "title": "Ustawienia zaawansowane",
-              "description": "Ustawienia zaawansowane komponentu Bosch Indego. Po zmianie tych ustawień może być konieczne ponowne załadowanie komponentu.",
-              "data": {
-                  "user_agent": "User-Agent",
-                  "expose_mower": "Wyświetl kosiarkę Indego jako encję kosiarki w HomeAssistant",
-                  "expose_vacuum": "Wyświetl kosiarkę Indego jako encję odkurzacza w HomeAssistant",
-                  "show_all_alerts": "Pokaż pełną historię alertów w HomeAssistant. Nie rekomendowane dla większości użytkowników, może mieć wpływ na znaczące zwiększenie rozmiaru bazy danych HomeAssistant!",
-                  "progress_line_width": "Progress line width (px)",
-                  "progress_line_color": "Progress line color",
+        "step": {
+            "init": {
+                "title": "Ustawienia zaawansowane",
+                "description": "Ustawienia zaawansowane komponentu Bosch Indego. Po zmianie tych ustawie\u0144 mo\u017ce by\u0107 konieczne ponowne za\u0142adowanie komponentu.",
+                "data": {
+                    "user_agent": "User-Agent",
+                    "expose_mower": "Wy\u015bwietl kosiark\u0119 Indego jako encj\u0119 kosiarki w HomeAssistant",
+                    "expose_vacuum": "Wy\u015bwietl kosiark\u0119 Indego jako encj\u0119 odkurzacza w HomeAssistant",
+                    "show_all_alerts": "Poka\u017c pe\u0142n\u0105 histori\u0119 alert\u00f3w w HomeAssistant. Nie rekomendowane dla wi\u0119kszo\u015bci u\u017cytkownik\u00f3w, mo\u017ce mie\u0107 wp\u0142yw na znacz\u0105ce zwi\u0119kszenie rozmiaru bazy danych HomeAssistant!",
                     "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
                     "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
                 }
-          }
-      }
+            }
+        }
     },
     "entity": {
         "binary_sensor": {
             "indego_alert": {
                 "state_attributes": {
                     "alerts_count": {
-                        "name": "Liczba alertów"
+                        "name": "Liczba alert\u00f3w"
                     },
                     "last_alert_error_code": {
-                        "name": "Kod ostatniego błędu"
+                        "name": "Kod ostatniego b\u0142\u0119du"
                     },
                     "last_alert_message": {
-                        "name": "Treść ostatniegoalertu"
+                        "name": "Tre\u015b\u0107 ostatniegoalertu"
                     },
                     "last_alert_date": {
                         "name": "Data ostatniego alertu"
@@ -118,40 +114,40 @@
     },
     "services": {
         "command": {
-            "description": "Wyślij polecenie do kosiarki. Dostępne polecenia to: mow, returnToDock oraz pause.",
+            "description": "Wy\u015blij polecenie do kosiarki. Dost\u0119pne polecenia to: mow, returnToDock oraz pause.",
             "fields": {
                 "mower_serial": {
                     "description": "Numer seryjny kosiarki. Wymagany tylko gdy konfigurujesz wiele kosiarek."
                 },
                 "command": {
-                    "description": "Polecenie do wysłania do kosiarki."
+                    "description": "Polecenie do wys\u0142ania do kosiarki."
                 }
             }
         },
         "smartmowing": {
-            "description": "Włącz lub wyłącz tryb SmartMowing. Dostępne polecenia to true lub false.",
+            "description": "W\u0142\u0105cz lub wy\u0142\u0105cz tryb SmartMowing. Dost\u0119pne polecenia to true lub false.",
             "fields": {
                 "mower_serial": {
                     "description": "Numer seryjny kosiarki. Wymagany tylko gdy konfigurujesz wiele kosiarek."
                 },
                 "enable": {
-                    "description": "Włącz tryb SmartMowing."
+                    "description": "W\u0142\u0105cz tryb SmartMowing."
                 }
             }
         },
         "delete_alert": {
-            "description": "Usuń zaznaczony alert.",
+            "description": "Usu\u0144 zaznaczony alert.",
             "fields": {
                 "mower_serial": {
                     "description": "Numer seryjny kosiarki. Wymagany tylko gdy konfigurujesz wiele kosiarek."
                 },
                 "alert_index": {
-                    "description": "Usuń zaznaczony alert. 0 dla ostatniego alertu."
+                    "description": "Usu\u0144 zaznaczony alert. 0 dla ostatniego alertu."
                 }
             }
         },
         "delete_alert_all": {
-            "description": "Usuń wszystkie alerty.",
+            "description": "Usu\u0144 wszystkie alerty.",
             "fields": {
                 "mower_serial": {
                     "description": "Numer seryjny kosiarki. Wymagany tylko gdy konfigurujesz wiele kosiarek."

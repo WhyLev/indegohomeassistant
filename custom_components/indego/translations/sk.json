@@ -1,69 +1,65 @@
 {
     "config": {
         "abort": {
-            "already_configured": "Táto kosačka Bosch Indego je už nakonfigurovaná!",
-            "connection_error": "Pripojenie k Bosch Indego API zlyhalo! Použite stránku so známymi problémami (https://github.com/WhyLev/indegohomeassistant/issues) pre možné riešenia.",
-            "no_mowers_found": "V tomto účte Bosch Indego sa nenašli žiadne kosačky!"
+            "already_configured": "T\u00e1to kosa\u010dka Bosch Indego je u\u017e nakonfigurovan\u00e1!",
+            "connection_error": "Pripojenie k Bosch Indego API zlyhalo! Pou\u017eite str\u00e1nku so zn\u00e1mymi probl\u00e9mami (https://github.com/WhyLev/indegohomeassistant/issues) pre mo\u017en\u00e9 rie\u0161enia.",
+            "no_mowers_found": "V tomto \u00fa\u010dte Bosch Indego sa nena\u0161li \u017eiadne kosa\u010dky!"
         },
         "step": {
             "advanced": {
                 "data": {
                     "user_agent": "User-Agent",
-                    "expose_mower": "Odhaľte kosačku Indego ako entitu kosačky v aplikácii HomeAssistant",
-                    "expose_vacuum": "Odhaľte kosačku Indego ako vákuovú entitu v aplikácii HomeAssistant",
-                    "progress_line_width": "Progress line width (px)",
-                    "progress_line_color": "Progress line color"
+                    "expose_mower": "Odha\u013ete kosa\u010dku Indego ako entitu kosa\u010dky v aplik\u00e1cii HomeAssistant",
+                    "expose_vacuum": "Odha\u013ete kosa\u010dku Indego ako v\u00e1kuov\u00fa entitu v aplik\u00e1cii HomeAssistant"
                 },
-                "description": "Rozšírené nastavenia komponentu Bosch Indego."
+                "description": "Roz\u0161\u00edren\u00e9 nastavenia komponentu Bosch Indego."
             },
             "mower": {
                 "data": {
-                    "mower_serial": "Séria kosačky",
-                    "mower_name": "Názov kosačky"
+                    "mower_serial": "S\u00e9ria kosa\u010dky",
+                    "mower_name": "N\u00e1zov kosa\u010dky"
                 },
-                "description": "Vyberte prosím sériové číslo kosačky Bosch, ktorú chcete pridať."
+                "description": "Vyberte pros\u00edm s\u00e9riov\u00e9 \u010d\u00edslo kosa\u010dky Bosch, ktor\u00fa chcete prida\u0165."
             }
         }
     },
     "options": {
-      "step": {
-          "init": {
-              "title": "Pokročilé nastavenia",
-              "description": "Rozšírené nastavenia komponentu Bosch Indego. Po zmene týchto nastavení možno budete musieť znova načítať komponent.",
-              "data": {
-                  "user_agent": "User-Agent",
-                  "expose_mower": "Odhaľte kosačku Indego ako entitu kosačky v aplikácii HomeAssistant",
-                  "expose_vacuum": "Odhaľte kosačku Indego ako vákuovú entitu v aplikácii HomeAssistant",
-                  "show_all_alerts": "Zobrazte celú históriu upozornení v aplikácii HomeAssistant. Toto sa neodporúča väčšine používateľov, môže to mať významný vplyv na veľkosť databázy HomeAssistant!",
-                  "progress_line_width": "Progress line width (px)",
-                  "progress_line_color": "Progress line color",
+        "step": {
+            "init": {
+                "title": "Pokro\u010dil\u00e9 nastavenia",
+                "description": "Roz\u0161\u00edren\u00e9 nastavenia komponentu Bosch Indego. Po zmene t\u00fdchto nastaven\u00ed mo\u017eno budete musie\u0165 znova na\u010d\u00edta\u0165 komponent.",
+                "data": {
+                    "user_agent": "User-Agent",
+                    "expose_mower": "Odha\u013ete kosa\u010dku Indego ako entitu kosa\u010dky v aplik\u00e1cii HomeAssistant",
+                    "expose_vacuum": "Odha\u013ete kosa\u010dku Indego ako v\u00e1kuov\u00fa entitu v aplik\u00e1cii HomeAssistant",
+                    "show_all_alerts": "Zobrazte cel\u00fa hist\u00f3riu upozornen\u00ed v aplik\u00e1cii HomeAssistant. Toto sa neodpor\u00fa\u010da v\u00e4\u010d\u0161ine pou\u017e\u00edvate\u013eov, m\u00f4\u017ee to ma\u0165 v\u00fdznamn\u00fd vplyv na ve\u013ekos\u0165 datab\u00e1zy HomeAssistant!",
                     "state_update_timeout": "State update timeout configurable via `state_update_timeout` option (default 10s)",
                     "longpoll_timeout": "Long poll timeout configurable via `longpoll_timeout` option (default 60s)"
                 }
-          }
-      }
+            }
+        }
     },
     "entity": {
         "binary_sensor": {
             "indego_alert": {
                 "state_attributes": {
                     "alerts_count": {
-                        "name": "Počet upozornení"
+                        "name": "Po\u010det upozornen\u00ed"
                     },
                     "last_alert_error_code": {
-                        "name": "Kód chyby (najnovší)"
+                        "name": "K\u00f3d chyby (najnov\u0161\u00ed)"
                     },
                     "last_alert_message": {
-                        "name": "Výstražná správa (najnovšia)"
+                        "name": "V\u00fdstra\u017en\u00e1 spr\u00e1va (najnov\u0161ia)"
                     },
                     "last_alert_date": {
-                        "name": "Dátum upozornenia (najnovší)"
+                        "name": "D\u00e1tum upozornenia (najnov\u0161\u00ed)"
                     },
                     "last_alert_read": {
-                        "name": "Stav upozornenia (najnovší)",
+                        "name": "Stav upozornenia (najnov\u0161\u00ed)",
                         "state": {
-                            "read": "Prečítané",
-                            "unread": "Neprečítané"
+                            "read": "Pre\u010d\u00edtan\u00e9",
+                            "unread": "Nepre\u010d\u00edtan\u00e9"
                         }
                     }
                 }
@@ -72,62 +68,62 @@
     },
     "services": {
         "command": {
-            "description": "Odošlite príkazy kosačke. Povolené príkazy sú teraz, vráťte sa do doku a pozastavte.",
+            "description": "Odo\u0161lite pr\u00edkazy kosa\u010dke. Povolen\u00e9 pr\u00edkazy s\u00fa teraz, vr\u00e1\u0165te sa do doku a pozastavte.",
             "fields": {
                 "mower_serial": {
-                    "description": "Sériová kosačka. Potrebné iba vtedy, keď máte nakonfigurovaných viacero kosačiek."
+                    "description": "S\u00e9riov\u00e1 kosa\u010dka. Potrebn\u00e9 iba vtedy, ke\u010f m\u00e1te nakonfigurovan\u00fdch viacero kosa\u010diek."
                 },
                 "command": {
-                    "description": "Príkaz pre kosačku."
+                    "description": "Pr\u00edkaz pre kosa\u010dku."
                 }
             }
         },
         "smartmowing": {
-            "description": "Povoliť alebo zakázať funkciu SmartMowing. Povolené príkazy sú true alebo false.",
+            "description": "Povoli\u0165 alebo zak\u00e1za\u0165 funkciu SmartMowing. Povolen\u00e9 pr\u00edkazy s\u00fa true alebo false.",
             "fields": {
                 "mower_serial": {
-                    "description": "Sériová kosačka. Potrebné iba vtedy, keď máte nakonfigurovaných viacero kosačiek."
+                    "description": "S\u00e9riov\u00e1 kosa\u010dka. Potrebn\u00e9 iba vtedy, ke\u010f m\u00e1te nakonfigurovan\u00fdch viacero kosa\u010diek."
                 },
                 "enable": {
-                    "description": "Povoliť SmartMowing."
+                    "description": "Povoli\u0165 SmartMowing."
                 }
             }
         },
         "delete_alert": {
-            "description": "Odstrániť vybraté upozornenie.",
+            "description": "Odstr\u00e1ni\u0165 vybrat\u00e9 upozornenie.",
             "fields": {
                 "mower_serial": {
-                    "description": "Sériová kosačka. Potrebné iba vtedy, keď máte nakonfigurovaných viacero kosačiek."
+                    "description": "S\u00e9riov\u00e1 kosa\u010dka. Potrebn\u00e9 iba vtedy, ke\u010f m\u00e1te nakonfigurovan\u00fdch viacero kosa\u010diek."
                 },
                 "alert_index": {
-                    "description": "Odstrániť vybraté upozornenia. 0 pre najnovšie upozornenie."
+                    "description": "Odstr\u00e1ni\u0165 vybrat\u00e9 upozornenia. 0 pre najnov\u0161ie upozornenie."
                 }
             }
         },
         "delete_alert_all": {
-            "description": "Odstráňte všetky upozornenia.",
+            "description": "Odstr\u00e1\u0148te v\u0161etky upozornenia.",
             "fields": {
                 "mower_serial": {
-                    "description": "Sériová kosačka. Potrebné iba vtedy, keď máte nakonfigurovaných viacero kosačiek."
+                    "description": "S\u00e9riov\u00e1 kosa\u010dka. Potrebn\u00e9 iba vtedy, ke\u010f m\u00e1te nakonfigurovan\u00fdch viacero kosa\u010diek."
                 }
             }
         },
         "read_alert": {
-            "description": "Označte vybrané upozornenie ako prečítané.",
+            "description": "Ozna\u010dte vybran\u00e9 upozornenie ako pre\u010d\u00edtan\u00e9.",
             "fields": {
                 "mower_serial": {
-                    "description": "Sériová kosačka. Potrebné iba vtedy, keď máte nakonfigurovaných viacero kosačiek."
+                    "description": "S\u00e9riov\u00e1 kosa\u010dka. Potrebn\u00e9 iba vtedy, ke\u010f m\u00e1te nakonfigurovan\u00fdch viacero kosa\u010diek."
                 },
                 "alert_index": {
-                    "description": "Označte vybrané upozornenie ako prečítané. 0 pre najnovšie upozornenie."
+                    "description": "Ozna\u010dte vybran\u00e9 upozornenie ako pre\u010d\u00edtan\u00e9. 0 pre najnov\u0161ie upozornenie."
                 }
             }
         },
         "read_alert_all": {
-            "description": "Označte všetky upozornenia ako prečítané.",
+            "description": "Ozna\u010dte v\u0161etky upozornenia ako pre\u010d\u00edtan\u00e9.",
             "fields": {
                 "mower_serial": {
-                    "description": "Sériová kosačka. Potrebné iba vtedy, keď máte nakonfigurovaných viacero kosačiek."
+                    "description": "S\u00e9riov\u00e1 kosa\u010dka. Potrebn\u00e9 iba vtedy, ke\u010f m\u00e1te nakonfigurovan\u00fdch viacero kosa\u010diek."
                 }
             }
         }

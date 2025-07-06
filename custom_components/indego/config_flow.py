@@ -24,12 +24,8 @@ from .const import (
     CONF_USER_AGENT,
     CONF_POSITION_UPDATE_INTERVAL,
     CONF_ADAPTIVE_POSITION_UPDATES,
-    CONF_PROGRESS_LINE_WIDTH,
-    CONF_PROGRESS_LINE_COLOR,
     DEFAULT_POSITION_UPDATE_INTERVAL,
     DEFAULT_ADAPTIVE_POSITION_UPDATES,
-    MAP_PROGRESS_LINE_WIDTH,
-    MAP_PROGRESS_LINE_COLOR,
     CONF_STATE_UPDATE_TIMEOUT,
     DEFAULT_STATE_UPDATE_TIMEOUT,
     CONF_LONGPOLL_TIMEOUT,
@@ -99,14 +95,6 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
                     CONF_ADAPTIVE_POSITION_UPDATES,
                     default=self.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES),
                 ): bool,
-                vol.Optional(
-                    CONF_PROGRESS_LINE_WIDTH,
-                    default=self.options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH),
-                ): int,
-                vol.Optional(
-                    CONF_PROGRESS_LINE_COLOR,
-                    default=self.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
-                ): str,
                 vol.Optional(
                     CONF_STATE_UPDATE_TIMEOUT,
                     default=self.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT),
@@ -206,8 +194,6 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
             self._options[CONF_EXPOSE_INDEGO_AS_VACUUM] = user_input[CONF_EXPOSE_INDEGO_AS_VACUUM]
             self._options[CONF_POSITION_UPDATE_INTERVAL] = user_input[CONF_POSITION_UPDATE_INTERVAL]
             self._options[CONF_ADAPTIVE_POSITION_UPDATES] = user_input[CONF_ADAPTIVE_POSITION_UPDATES]
-            self._options[CONF_PROGRESS_LINE_WIDTH] = user_input[CONF_PROGRESS_LINE_WIDTH]
-            self._options[CONF_PROGRESS_LINE_COLOR] = user_input[CONF_PROGRESS_LINE_COLOR]
             self._options[CONF_STATE_UPDATE_TIMEOUT] = user_input[CONF_STATE_UPDATE_TIMEOUT]
             self._options[CONF_LONGPOLL_TIMEOUT] = user_input[CONF_LONGPOLL_TIMEOUT]
 
@@ -262,14 +248,6 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
                     CONF_ADAPTIVE_POSITION_UPDATES,
                     default=(self._options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES))
                 ): bool,
-                vol.Optional(
-                    CONF_PROGRESS_LINE_WIDTH,
-                    default=(self._options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH))
-                ): int,
-                vol.Optional(
-                    CONF_PROGRESS_LINE_COLOR,
-                    default=(self._options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR))
-                ): str,
                 vol.Optional(
                     CONF_STATE_UPDATE_TIMEOUT,
                     default=(self._options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT))
