@@ -1,209 +1,131 @@
-# Indego Home Assistant Integration
+# Bosch Indego Integration for Home Assistant
 
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/WhyLev/indegohomeassistant)
+![GitHub contributors](https://img.shields.io/github/contributors/WhyLev/indegohomeassistant)
+[![Discord](https://img.shields.io/discord/983383013830864927)](https://discord.gg/aD33GsP)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 
-Join the [Discord community](https://discord.gg/aD33GsP) to ask questions, share feedback, and help shape future development!
+A modern, fully-featured Home Assistant integration for Bosch Indego robotic lawn mowers.
 
-Read the [Wiki](https://github.com/WhyLev/indegohomeassistant/wiki/Indego-Home-Assistant-Integration) for help
----
+## 🌟 Features
 
-## 🌱 Overview
+- Modern OAuth2 authentication via Bosch SingleKey ID
+- Real-time state monitoring and control
+- Rich sensor data including:
+  - Battery status and temperature
+  - Mowing progress and statistics
+  - Runtime analytics
+  - Garden coverage tracking
+- Interactive map visualization with:
+  - Static base map
+  - Dynamic progress overlay
+  - Configurable appearance
+- Smart automation capabilities:
+  - Mowing schedule management
+  - Weather-aware planning
+  - Alerts and notifications
+- Comprehensive command support:
+  - Start/Stop mowing
+  - Return to dock
+  - SmartMowing control
+  - Alert management
 
-**Indego Home Assistant** is a custom component for Bosch Indego robotic lawn mowers. It offers real-time mower data, control commands, map rendering, and a beautiful Lovelace dashboard using Mushroom, ApexCharts, and Card Mod.
+## 📦 Installation
 
-This fork combines the solid Bosch Indego integration developed by [sander1988](https://github.com/sander1988) with the camera and feature enhancements introduced by [kimzeuner](https://github.com/kimzeuner), while the new UI/UX design and dashboard were created by myself.
+### HACS (Recommended)
 
----
+1. Open HACS in Home Assistant
+2. Go to "Integrations"
+3. Click the "+" button
+4. Search for "Bosch Indego Mower"
+5. Click "Download"
+6. Restart Home Assistant
 
-## ⚙️ Features
+### Manual
 
-* OAuth2 login via Bosch SingleKey ID
-* Real-time state, mowing progress, battery status
-* Static map camera plus animated progress camera (resets after 24h or on completion)
-* Progress path appearance configurable (width & color)
-* Alert and error handling with delete/read actions
-* Service commands: mow, pause, return to dock
-* SmartMowing toggling
-* Map position updates every 10 seconds by default (configurable)
-* State update timeout configurable via `state_update_timeout` option (default 10s)
-* Download the mower map once using the `indego.download_map` service
-* Force a data refresh anytime via the `indego.refresh` service
-* Forecast sensor with rain probability & mow suggestion
-* Mushroom-based Lovelace dashboard with
-
-  * Status grid
-  * Battery widget
-  * Command buttons
-  * Alert deletion
-  * Weather chips (OpenWeatherMap + OpenUV)
-
----
-
-## 🔧 Installation
-
-### Option 1: Manual
-
-1. Copy `custom_components/indego` into your Home Assistant config directory
+1. Copy the `custom_components/indego` directory to your Home Assistant configuration directory
 2. Restart Home Assistant
 
----
+## 🔐 Authentication
 
-## 🌐 Authentication Setup
+This integration uses Bosch's modern OAuth2 authentication system. Due to CORS restrictions, you'll need to use the provided Chrome extension for the initial setup:
 
-Bosch requires login via **SingleKey ID** with OAuth2. Due to CORS restrictions, authentication requires **Google Chrome** and a **temporary extension**.
+1. Download and unzip `chrome-extension.zip`
+2. Open Chrome Extensions page (chrome://extensions/)
+3. Enable Developer Mode
+4. Click "Load unpacked" and select the unzipped folder
+5. In Home Assistant, add the integration and follow the prompts
+6. After successful authentication, you can remove the extension
 
-### Chrome Extension Setup
+Alternatively, you can use the `auth_proxy.py` script included in this repository.
 
-1. Download [chrome-extension.zip](/chrome-extension.zip)
-2. Unzip it
-3. Open `chrome://extensions/`
-4. Enable *Developer mode* (top right)
-5. Click *Load unpacked*, select unzipped folder
-6. Authenticate via Home Assistant: *Settings > Devices & Services > Add Integration > Bosch Indego Mower*
+## 🎛 Configuration
 
-After linking, you can disable/remove the extension.
+All configuration is handled through the UI. Available options include:
 
-> Note: You can add multiple Indego devices individually.
+- Update intervals for position and state
+- Map appearance customization
+- Alert filtering preferences
+- Smart mowing settings
 
-### Alternative OAuth Helper
+## 🤖 Entities
 
-If you prefer not to use Chrome, run `auth_proxy.py` from this repository. It
-starts a small web server that forwards the OAuth callback to Home Assistant.
-Open the printed URL, complete the login and the token will be sent to HA.
+The integration provides the following entities:
 
----
+| Entity | ID Pattern | Description |
+|--------|------------|-------------|
+| Mower State | `sensor.indego_mower_state` | Current operational state |
+| Battery | `sensor.indego_battery_percentage` | Battery level and charging status |
+| Mowing Progress | `sensor.indego_lawn_mowed` | Percentage of lawn covered |
+| Runtime Stats | `sensor.indego_runtime_total` | Total operation time |
+| Alerts | `binary_sensor.indego_alert` | Active alerts indicator |
+| Map | `camera.indego` | Static garden map |
+| Progress Map | `camera.indego_progress` | Dynamic mowing progress |
 
-## 🪡 Entities & Sensors
+## 🛠 Services
 
-All entities are auto-discovered and appear under *unused entities* after integration.
+Available services include:
 
-| Function           | Entity                                           |
-| ------------------ | ------------------------------------------------ |
-| Mower state        | `sensor.indego_mower_state`             |
-| Mower state detail | `sensor.indego_mower_state_detail`      |
-| Lawn mowed %       | `sensor.indego_lawn_mowed`              |
-| Total runtime      | `sensor.indego_runtime_total`           |
-| Total mowing time  | `sensor.indego_total_mowing_time`       |
-| Total charging time| `sensor.indego_total_charging_time`     |
-| Total operation time| `sensor.indego_total_operation_time`   |
-| Battery percentage | `sensor.indego_battery_percentage`      |
-| Ambient temperature | `sensor.indego_ambient_temperature`    |
-| Battery temperature | `sensor.indego_battery_temperature`    |
-| Battery cycles      | `sensor.indego_battery_cycles`         |
-| Average mow time    | `sensor.indego_average_mow_time`       |
-| Weekly mowed area   | `sensor.indego_weekly_area`            |
-| Alerts present     | `binary_sensor.indego_alert`            |
-| Last completed     | `sensor.indego_last_completed`          |
-| Next scheduled mow | `sensor.indego_next_mow`                |
-| Forecast           | `sensor.indego_forecast`                |
-| Mowing mode        | `sensor.indego_mowing_mode`             |
-| Garden size        | `sensor.indego_garden_size`             |
-| Online state       | `binary_sensor.indego_online`           |
-| Update available   | `binary_sensor.indego_update_available` |
-| Firmware version   | `sensor.indego_firmware_version`        |
-| Serial number      | `sensor.indego_serial_number`           |
-| Camera map         | `camera.indego` (static)                |
-| Progress camera    | `camera.indego_progress`                |
-
-### Automation Examples
-
-Use these sensors to build automations. Examples:
-
-```yaml
-- alias: Notify when mower battery cycles high
-  trigger:
-    - platform: numeric_state
-      entity_id: sensor.indego_battery_cycles
-      above: 500
-  action:
-    - service: notify.mobile_app_phone
-      data:
-        message: "Indego battery has reached 500 cycles."
-```
-
-```yaml
-- alias: Log weekly mowed area
-  trigger:
-    - platform: time
-      at: "23:59:00"
-  action:
-    - service: system_log.write
-      data:
-        message: "Mowed area this week: {{ states('sensor.indego_weekly_area') }} m²"
-```
-
-
----
-
-## 🚜 Services
-
-You can call the following services:
-
-| Service                   | Purpose                                |
-| ------------------------- | -------------------------------------- |
-| `indego.command`          | Send `mow`, `pause`, or `returnToDock` |
-| `indego.smartmowing`      | Toggle SmartMowing on/off              |
-| `indego.read_alert`       | Mark one alert as read                 |
-| `indego.read_alert_all`   | Mark all alerts as read                |
-| `indego.delete_alert`     | Delete one alert                       |
-| `indego.delete_alert_all` | Delete all alerts                      |
-| `indego.download_map`     | Save the mower map to `www/indego_map_SERIALNUMBER.svg` |
-| `indego.refresh`          | Refresh mower data immediately (if not in cooldown) |
-
-The map file is saved inside Home Assistant's configuration directory. On
-standard installations this is accessible at `/config/www` from within the
-container. If you run Home Assistant in Docker, this folder maps to the path
-where your configuration volume is mounted (for example
-`volumes/homeassistant/config/www`).
-
----
+| Service | Description |
+|---------|-------------|
+| `indego.command` | Send mower commands (mow/pause/dock) |
+| `indego.smartmowing` | Toggle SmartMowing feature |
+| `indego.read_alert` | Mark alerts as read |
+| `indego.delete_alert` | Remove alerts |
+| `indego.download_map` | Save current map as SVG |
 
 ## 📊 Dashboard
 
-A complete Mushroom-based dashboard is included in `/dashboard/lovelace.yaml`. Highlights:
+A modern Mushroom-based dashboard is included in the `dashboard/` directory. Features:
 
-* Picture-entity with camera map
-* Battery widget (colored icon)
-* Status grid (state, lawn mowed, last/next mow, alerts, updates)
-* Weather chips (OpenWeather, OpenUV)
-* Command buttons (Start, Pause, Dock)
+- Clean, modern UI
+- Responsive design
+- Status overview
+- Command shortcuts
+- Weather integration
 
-Required HACS Frontend Cards:
+Required HACS Frontend dependencies:
+- Mushroom
+- Card Mod
+- ApexCharts Card
+- Vertical Stack in Card
 
-* [Mushroom](https://github.com/piitaya/lovelace-mushroom)
-* [Card Mod](https://github.com/thomasloven/lovelace-card-mod)
-* [ApexCharts Card](https://github.com/RomRider/apexcharts-card)
-* [Vertical Stack in Card](https://github.com/ofekashery/vertical-stack-in-card)
-* [OpenUV](https://www.home-assistant.io/integrations/openuv/)
+## 🤝 Contributing
 
----
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md).
 
-## 🌿 Supported Mower Models
+## 📄 License
 
-All Indego models are supported. See [the GitHub repository](https://github.com/WhyLev/indegohomeassistant) for details.
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
 
-## 🛠️ Troubleshooting
+## 💬 Support
 
-### 502 Bad Gateway
-A `502 Bad Gateway` error usually means the Bosch Indego service is temporarily unavailable. Wait a minute and try again. You can lower the request rate by increasing the **Position update interval** or enabling **Adaptive position updates** in the integration options. If calls still time out, raise the **State update timeout**.
+- Join our [Discord community](https://discord.gg/aD33GsP)
+- Report issues on [GitHub](https://github.com/WhyLev/indegohomeassistant/issues)
+- Check the [Wiki](https://github.com/WhyLev/indegohomeassistant/wiki) for detailed documentation
 
-### Unknown mower state
-When the mower state shows as `unknown`, the mower did not respond before the timeout. Increase **State update timeout** and consider a longer **Position update interval** to reduce polling.
+## 🙏 Credits
 
-
----
-
-## ❤️ Credits
-
-* Special thanks to [**kimzeuner**](https://github.com/kimzeuner) for the Camera-System
-* Gratitude to [**sander1988**](https://github.com/sander1988) for the OAuth-based Indego integration
-* Based on [iMarkus/Indego](https://github.com/iMarkus/Indego) and ideas from [grauonline.de](http://grauonline.de/wordpress/?page_id=219)
-
----
-
-## 🙋 Support
-
-For issues, open a [GitHub Issue](https://github.com/WhyLev/indegohomeassistant/issues) or join the [Discord](https://discord.gg/aD33GsP).
-
-> Pull Requests welcome! Help improve features, translations, or dashboards.
-
----
+- Original OAuth implementation by [sander1988](https://github.com/sander1988)
+- Camera system by [kimzeuner](https://github.com/kimzeuner)
+- Based on work from [iMarkus/Indego](https://github.com/iMarkus/Indego)

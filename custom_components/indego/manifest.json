@@ -1,17 +1,26 @@
 {
   "domain": "indego",
-  "name": "Bosch Indego Mower HomeAssistant",
+  "name": "Bosch Indego Mower",
   "config_flow": true,
   "documentation": "https://github.com/WhyLev/indegohomeassistant",
+  "issue_tracker": "https://github.com/WhyLev/indegohomeassistant/issues",
   "dependencies": [
     "application_credentials",
     "http"
   ],
   "codeowners": ["@WhyLev"],
-  "requirements": ["svgutils==0.3.4"],
-  "iot_class": "cloud_push",
-  "version": "1.2.3",
+  "requirements": [
+    "svgutils==0.3.4",
+    "aiohttp>=3.8.0",
+    "pytz>=2023.3",
+    "voluptuous>=0.13.1"
+  ],
+  "iot_class": "cloud_polling",
+  "version": "2.0.0",
   "oauth2_create_authorization": true,
-  "diagnostic": ["custom_components.indego.diagnostics"],
-  "loggers": ["custom_components.indego", "pyIndego"]
+  "diagnostics": true,
+  "loggers": ["custom_components.indego", "pyIndego"],
+  "integration_type": "hub",
+  "min_ha_version": "2023.8.0",
+  "quality_scale": "platinum"
 }
