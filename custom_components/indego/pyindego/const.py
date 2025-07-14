@@ -1,6 +1,6 @@
 """Constants for pyIndego."""
 from enum import Enum
-from pyIndego.version import __version__
+from .version import __version__
 
 
 class Methods(Enum):
@@ -23,10 +23,7 @@ COMMANDS = ("mow", "pause", "returnToDock")
 DEFAULT_HEADERS = {
     CONTENT_TYPE: CONTENT_TYPE_JSON,
     # We need to change the user-agent!
-    # The Microsoft Azure proxy WAF seems to block all requests (HTTP 403) for the default 'python-requests' user-agent.
-    # See issues:
-    # - https://github.com/sander1988/pyIndego/issues/119
-    # - https://github.com/sander1988/Indego/issues/204
+    # The Microsoft Azure proxy WAF seems to block requests (HTTP 403) for the default 'python-requests' user-agent.
     'User-Agent': "pyIndego (%s)" % __version__
 }
 DEFAULT_LOOKUP_VALUE = "Not in database."
@@ -198,31 +195,5 @@ MOWER_MODEL_DESCRIPTION = {
 
 MOWING_MODE_DESCRIPTION = {
     "smart": "SmartMowing",
-    "calendar": "Calendar",
-    "manual": "Manual",
-}
-
-ALERT_ERROR_CODE = {
-    "104": "Stop button pushed",
-    "101": "Mower lifted",
-    "115": "Mower is stuck",
-    "1008": "Mower is stuck",
-    "149": "Mower outside perimeter cable",
-    "151": "Perimeter cable signal missing",
-    "ntfy_blade_life": "Reminder blade life",
-    "1005": "Mower has not entered the charging station",
-    "smartMow.mowerUnreachable": "SmartMowing disabled",
-    "1108": "Too large tilt angle",
-    "1138": "Mower needs help",
-    "firmware.updateComplete": "Software update complete",
-}
-
-DAY_MAPPING = {
-    0: "monday",
-    1: "tuesday",
-    2: "wednesday",
-    3: "thursday",
-    4: "friday",
-    5: "saturday",
-    6: "sunday",
+    "calendar": "CalendarMowing"
 }

@@ -3,11 +3,15 @@
   "name": "Bosch Indego Mower HomeAssistant",
   "config_flow": true,
   "documentation": "https://github.com/WhyLev/indegohomeassistant",
-  "dependencies": ["application_credentials"],
+  "dependencies": [
+    "application_credentials",
+    "http"
+  ],
   "codeowners": ["@WhyLev"],
   "requirements": ["svgutils==0.3.4"],
   "iot_class": "cloud_push",
-  "version": "1.2.2",
+  "version": "1.2.3",
+  "oauth2_create_authorization": true,
   "diagnostic": ["custom_components.indego.diagnostics"],
   "loggers": ["custom_components.indego", "pyIndego"]
 }

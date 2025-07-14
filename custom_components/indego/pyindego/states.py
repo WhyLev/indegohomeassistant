@@ -5,9 +5,6 @@ from datetime import date, datetime, time, timedelta
 from typing import List
 
 from .const import (
-    ALERT_ERROR_CODE,
-    DAY_MAPPING,
-    DEFAULT_LOOKUP_VALUE,
     MOWER_MODEL_DESCRIPTION,
     MOWING_MODE_DESCRIPTION,
 )
@@ -33,9 +30,7 @@ class Alert:
 
     def __post_init__(self):
         """Set alert description."""
-        self.alert_description = ALERT_ERROR_CODE.get(
-            self.error_code, DEFAULT_LOOKUP_VALUE
-        )
+        self.alert_description = "Unknown"  # We'll add error codes later
         self.date = convert_bosch_datetime(self.date)
 
 
@@ -61,7 +56,7 @@ MOWER_MODEL_VOLTAGE = {
     "3600HB0106": ModelVoltage(min=0, max=100),     # Indego S+ 400 2gen
     "3600HB0302": ModelVoltage(min=0, max=100),     # Indego S+ 500
     "3600HB0301": ModelVoltage(min=0, max=100),     # Indego M+ 700 1gen
-    "3600HB0303": ModelVoltage(min=0, max=100),     # Indego M+ 700 gen2
+    "3600HB0303": ModelVoltage(min=0, max=100),     # Indego M+ 700 2gen
 }
 
 
@@ -106,6 +101,16 @@ class CalendarSlot:
         if self.EnHr is not None and self.EnMin is not None:
             self.end = time(self.EnHr, self.EnMin)
 
+
+DAY_MAPPING = {
+    0: "Monday",
+    1: "Tuesday", 
+    2: "Wednesday",
+    3: "Thursday",
+    4: "Friday",
+    5: "Saturday",
+    6: "Sunday"
+}
 
 @nested_dataclass
 class CalendarDay:
@@ -167,19 +172,18 @@ class GenericData:
     model_description: str = None
     model_voltage: ModelVoltage = field(default_factory=ModelVoltage)
     mowing_mode_description: str = None
-    #renew_date: str = None
     renew_date: datetime = None
 
     def __post_init__(self):
         """Set model description, voltage, mode description."""
         self.model_description = MOWER_MODEL_DESCRIPTION.get(
-            self.bareToolnumber, DEFAULT_LOOKUP_VALUE
+            self.bareToolnumber, "Unknown Model"
         )
         self.model_voltage = MOWER_MODEL_VOLTAGE.get(
             self.bareToolnumber, ModelVoltage()
         )
         self.mowing_mode_description = MOWING_MODE_DESCRIPTION.get(
-            self.alm_mode, DEFAULT_LOOKUP_VALUE
+            self.alm_mode, "Unknown Mode"
         )
         self.renew_date = convert_bosch_datetime(self.renew_date)
 

@@ -1,24 +1,40 @@
-from .const import OAUTH2_AUTHORIZE, OAUTH2_TOKEN
-from .api import IndegoLocalOAuth2Implementation
+"""OAuth2 implementation for Indego."""
+from typing import cast
 
-from homeassistant.components.application_credentials import AuthorizationServer, ClientCredential
-from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.components.application_credentials import (
+    AuthImplementation,
+    AuthorizationServer,
+    ClientCredential,
+)
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_entry_oauth2_flow
+
+from .const import OAUTH2_AUTHORIZE, OAUTH2_TOKEN
+
+
+class IndegoOAuth2Implementation(config_entry_oauth2_flow.LocalOAuth2Implementation):
+    """Indego OAuth2 implementation."""
+
+    @property
+    def name(self) -> str:
+        """Return name of implementation."""
+        return "Bosch Indego"
+
+    @property
+    def redirect_uri(self) -> str:
+        """Return the redirect uri."""
+        return "com.bosch.indegoconnect://login"
+
 
 async def async_get_auth_implementation(
     hass: HomeAssistant, auth_domain: str, credential: ClientCredential
 ) -> config_entry_oauth2_flow.AbstractOAuth2Implementation:
-    """Return custom auth implementation."""
-
-    # Secret needs to be unset or auth fails.
-    # But ClientCredential() fail to store when it's set to None.
-    # So we store "" in the config_flow.py and clear it here before use.
-    credential.client_secret = None
-
-    return IndegoLocalOAuth2Implementation(
+    """Return auth implementation."""
+    return IndegoOAuth2Implementation(
         hass,
         auth_domain,
-        credential,
+        credential.client_id,
+        None,  # Bosch OAuth requires no client secret
         AuthorizationServer(
             authorize_url=OAUTH2_AUTHORIZE,
             token_url=OAUTH2_TOKEN,

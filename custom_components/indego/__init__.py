@@ -46,15 +46,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_entry_oauth2_flow import async_get_config_entry_implementation
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.event import async_track_time_interval
-import sys
-import os.path as path
 
-# Add local pyIndego to the Python path
-pyindego_path = path.join(path.dirname(path.dirname(path.dirname(__file__))), 'pyindego', 'pyIndego')
-if pyindego_path not in sys.path:
-    sys.path.insert(0, pyindego_path)
-
-from indego_async_client import IndegoAsyncClient
 from svgutils.transform import fromstring
 
 from .api import IndegoOAuth2Session
@@ -65,6 +57,7 @@ from .const import *
 from .sensor import IndegoSensor
 from .camera import IndegoCamera, IndegoMapCamera
 from .api_manager import IndegoApiManager
+from .pyindego.indego_async_client import IndegoAsyncClient
 
 _LOGGER = logging.getLogger(__name__)
 

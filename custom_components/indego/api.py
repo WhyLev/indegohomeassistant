@@ -4,16 +4,26 @@ from typing import cast
 import time
 
 
-class IndegoLocalOAuth2Implementation(
-    AuthImplementation,
-):
+class IndegoLocalOAuth2Implementation(AuthImplementation):
     """Indego Local OAuth2 implementation."""
-    pass
+    @property
+    def name(self) -> str:
+        """Return name of the implementation."""
+        return "Bosch Indego"
+
+    @property
+    def domain(self) -> str:
+        """Return the domain of the implementation."""
+        return "indego"
 
     @property
     def redirect_uri(self) -> str:
         """Return the redirect uri."""
         return "com.bosch.indegoconnect://login"
+        
+    async def async_generate_authorize_url(self, flow_id: str) -> str:
+        """Generate authorization url."""
+        return await super().async_generate_authorize_url(flow_id)
 
 
 class IndegoOAuth2Session(OAuth2Session):
