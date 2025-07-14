@@ -379,6 +379,212 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await indego_hub.start_periodic_position_update()
 
+    async def handle_command(call):
+        """Handle commands sent to the mower."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        command = call.data.get(CONF_SEND_COMMAND)
+
+        if serial is None:
+            _LOGGER.debug("No serial defined, getting all indego hubs")
+            targets = hass.data[DOMAIN].values()
+        else:
+            _LOGGER.debug("Serial defined, getting single hub")
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for command")
+            return
+
+        for target in targets:
+            _LOGGER.debug("Sending command to %s", target.serial)
+            try:
+                await target.api.put_command(command)
+            except Exception as exc:
+                _LOGGER.error(
+                    "Command '%s' failed on %s: %s",
+                    command,
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_smartmow(call):
+        """Handle smart mow commands."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        enable = call.data.get(CONF_SMARTMOWING)
+
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for smartmow command")
+            return
+
+        for target in targets:
+            try:
+                await target.api.put_mow_mode({"enabled": enable == "on"})
+            except Exception as exc:
+                _LOGGER.error(
+                    "Smartmow command failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_delete_alert(call):
+        """Handle delete alert commands."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        alert_index = call.data.get(SERVER_DATA_ALERT_INDEX)
+
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for delete alert command")
+            return
+
+        for target in targets:
+            try:
+                await target.api.delete_alert(alert_index)
+            except Exception as exc:
+                _LOGGER.error(
+                    "Delete alert failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_delete_alert_all(call):
+        """Handle delete all alerts command."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for delete all alerts command")
+            return
+
+        for target in targets:
+            try:
+                await target.api.delete_all_alerts()
+            except Exception as exc:
+                _LOGGER.error(
+                    "Delete all alerts failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_read_alert(call):
+        """Handle read alert command."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        alert_index = call.data.get(SERVER_DATA_ALERT_INDEX)
+
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for read alert command")
+            return
+
+        for target in targets:
+            try:
+                await target.api.put_alert_read(alert_index)
+            except Exception as exc:
+                _LOGGER.error(
+                    "Read alert failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_download_map(call):
+        """Handle map download."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+
+        if serial is None:
+            _LOGGER.error("Serial number required for map download")
+            return
+
+        targets = [
+            hub
+            for hub in hass.data[DOMAIN].values()
+            if hub.serial == serial
+        ]
+
+        if not targets:
+            _LOGGER.warning("No hub found for map download")
+            return
+
+        target = targets[0]
+        try:
+            await target.download_and_save_map()
+        except Exception as exc:
+            _LOGGER.error(
+                "Map download failed for %s: %s",
+                target.serial,
+                str(exc)
+            )
+
+    # Register all service handlers
+    hass.services.async_register(
+        DOMAIN, SERVICE_NAME_COMMAND, handle_command, schema=SERVICE_SCHEMA_COMMAND
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_SMARTMOW,
+        handle_smartmow,
+        schema=SERVICE_SCHEMA_SMARTMOWING,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_DELETE_ALERT,
+        handle_delete_alert,
+        schema=SERVICE_SCHEMA_DELETE_ALERT,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_DELETE_ALERT_ALL,
+        handle_delete_alert_all,
+        schema=SERVICE_SCHEMA_DELETE_ALERT_ALL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_READ_ALERT,
+        handle_read_alert,
+        schema=SERVICE_SCHEMA_READ_ALERT,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_DOWNLOAD_MAP,
+        handle_download_map,
+        schema=SERVICE_SCHEMA_DOWNLOAD_MAP,
+    )
+
     async def load_platforms():
         _LOGGER.debug("Loading platforms")
         await hass.config_entries.async_forward_entry_setups(entry, INDEGO_PLATFORMS)
@@ -397,6 +603,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except AttributeError as exc:
         _LOGGER.warning("Login unsuccessful: %s", str(exc))
         return False
+
+    return True
 
     def find_instance_for_mower_service_call(call):
         mower_serial = call.data.get(CONF_MOWER_SERIAL, None)
@@ -586,1019 +794,459 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 class IndegoHub:
-    """Class for the IndegoHub, which controls the sensors and binary sensors."""
+    """Indego API hub."""
 
     def __init__(
         self,
         name: str,
-        session: IndegoOAuth2Session,
+        oauth_session: IndegoOAuth2Session,
         serial: str,
-        features: dict,
+        options: dict,
         hass: HomeAssistant,
-        user_agent: Optional[str] = None,
-        position_interval: int = DEFAULT_POSITION_UPDATE_INTERVAL,
-        adaptive_updates: bool = DEFAULT_ADAPTIVE_POSITION_UPDATES,
+        user_agent: str = None,
+        position_update_interval: int = DEFAULT_POSITION_UPDATE_INTERVAL,
+        adaptive_position_updates: bool = DEFAULT_ADAPTIVE_POSITION_UPDATES,
         progress_line_width: int = MAP_PROGRESS_LINE_WIDTH,
         progress_line_color: str = MAP_PROGRESS_LINE_COLOR,
         state_update_timeout: int = DEFAULT_STATE_UPDATE_TIMEOUT,
         longpoll_timeout: int = DEFAULT_LONGPOLL_TIMEOUT,
     ):
-        """Initialize the IndegoHub.
-
-        Args:
-            name (str): the name of the mower for entities
-            session (IndegoOAuth2Session): the Bosch SingleKey ID OAuth session
-            serial (str): serial of the mower, is used for uniqueness
-            hass (HomeAssistant): HomeAssistant instance
-
-        """
-        self._mower_name = name
-        self._serial = serial
-        self._features = features
-        self._hass = hass
-        self._unsub_refresh_state = None
-        self._refresh_state_task = None
-        self._refresh_10m_remover = None
-        self._refresh_24h_remover = None
+        """Initialize the IndegoHub with updated API manager."""
+        self.hass = hass
+        self.name = name
+        self.options = options
+        self.serial = serial
+        self.last_position_update = None
         self._shutdown = False
-        self._latest_alert = None
-        self.entities = {}
-        self._update_fail_count = None
-        self._lawn_map = None
-        self._unsub_map_timer = None
-        self._last_position = (None, None)
-        self._last_state = None
-        self._position_interval = position_interval
-        self._current_position_interval = position_interval
-        self._adaptive_updates = adaptive_updates
+        self._oauth_session = oauth_session
+        self._first_update = True
+        self._position_update_interval = position_update_interval
+        self._adaptive_position_updates = adaptive_position_updates
         self._progress_line_width = progress_line_width
         self._progress_line_color = progress_line_color
         self._state_update_timeout = state_update_timeout
         self._longpoll_timeout = longpoll_timeout
-        self._weekly_area_entries = []
-        self._last_completed_ts = None
-        self._last_state_ts = None
-        self._online = False
-        self._offline_since = None
-        self._offline_failures = 0
-        self._pending_mower_state = None
-        self._pending_mower_detail = None
-        self._debounce_remover = None
+        self._position_update_timer = None
 
-        self._oauth_session = session
-        self._token_refresh_task = None
-        self._token_refresh_lock = asyncio.Lock()
-        self._last_token_refresh = None
-        self._token_expires_at = None
-        self._token_refresh_margin = 300  # Refresh token 5 minutes before expiry
-
-        async def async_token_refresh() -> str:
-            """Refresh the OAuth token when needed."""
-            async with self._token_refresh_lock:
-                now = datetime.utcnow()
-                
-                # If we recently refreshed the token, return the current one
-                if (self._last_token_refresh and 
-                    (now - self._last_token_refresh).total_seconds() < 30):
-                    return self._oauth_session.token["access_token"]
-                
-                try:
-                    await self._oauth_session.async_ensure_token_valid()
-                    self._last_token_refresh = now
-                    
-                    # Calculate token expiry time
-                    expires_in = self._oauth_session.token.get("expires_in")
-                    if expires_in:
-                        self._token_expires_at = now + timedelta(seconds=int(expires_in))
-                        # Schedule the next refresh
-                        await self._schedule_token_refresh()
-                    
-                    return self._oauth_session.token["access_token"]
-                    
-                except Exception as exc:
-                    _LOGGER.error("Failed to refresh token: %s", exc)
-                    raise
-        
-        # Setup initial client configuration
-        self._indego_client = IndegoAsyncClient(
-            token=session.token["access_token"],
-            token_refresh_method=async_token_refresh,
-            serial=self._serial,
-            session=async_get_clientsession(hass),
-            raise_request_exceptions=True
+        # Initialize the async client
+        self._async_client = IndegoAsyncClient(
+            token=oauth_session.token["access_token"],
+            token_refresh_method=self._oauth_session.async_ensure_token_valid,
+            serial=serial,
+            api_url="https://api.indego.iot.bosch-si.com/api/v1/",
+            session=async_get_clientsession(self.hass),
         )
-        self._indego_client.set_default_header(HTTP_HEADER_USER_AGENT, user_agent)
-        
-        # Initialize API manager
-        self._api = IndegoApiManager(hass, self._indego_client)
 
-    async def _schedule_token_refresh(self):
-        """Schedule the next token refresh."""
-        if not self._token_expires_at:
-            return
-            
-        now = datetime.utcnow()
-        refresh_at = self._token_expires_at - timedelta(seconds=self._token_refresh_margin)
-        
-        if refresh_at <= now:
-            # Token is already near expiry, refresh immediately
-            if not self._token_refresh_task or self._token_refresh_task.done():
-                self._token_refresh_task = self._hass.async_create_task(
-                    self._oauth_session.async_ensure_token_valid()
-                )
-            return
-            
-        # Cancel any existing refresh task
-        if self._token_refresh_task and not self._token_refresh_task.done():
-            self._token_refresh_task.cancel()
-            
-        # Schedule new refresh task
-        delay = (refresh_at - now).total_seconds()
-        self._token_refresh_task = self._hass.async_create_task(
-            self._delayed_token_refresh(delay)
-        )
-        
-    async def _delayed_token_refresh(self, delay: float):
-        """Perform a token refresh after a delay."""
+        # Initialize the API manager with the async client
+        self.api = IndegoApiManager(self.hass, self._async_client)
+
+        # Initialize state holders
+        self.states = {}
+        self.sensors = {}
+        self.binary_sensors = {}
+        self.vacuum = None
+        self.lawn_mower = None
+        self.generic_data_loaded = False
+        self.alerts = {}
+        self.alerts_count = 0
+        self.map_image = None
+        self.map_update_timestamp = None
+        self.map_filename = None
+        self.device_info = None
+        self._battery_percent = None
+        self._battery_percent_adjusted = None
+        self._mower_state = None
+        self._mower_state_detail = None
+        self._mower_state_description = None
+        self._lawn_mowed = None
+        self._runtime = None
+        self._last_completed = None
+        self._next_mow = None
+        self._last_update = None
+
+    async def _async_update_state(self, force_update: bool = False):
+        """Update state using the API manager."""
         try:
-            await asyncio.sleep(delay)
-            await self._oauth_session.async_ensure_token_valid()
-            self._last_token_refresh = datetime.utcnow()
-            
-            # Schedule next refresh based on new token
-            if "expires_in" in self._oauth_session.token:
-                self._token_expires_at = self._last_token_refresh + timedelta(
-                    seconds=int(self._oauth_session.token["expires_in"])
-                )
-                await self._schedule_token_refresh()
-                
-        except asyncio.CancelledError:
-            pass
+            state = await self.api.get_state(force=force_update, longpoll=True)
+            if state:
+                self._mower_state = state.state
+                self._mower_state_description = state.state_description
+                self._mower_state_detail = state.state_description_detail
+                self._last_update = last_updated_now()
+                return True
         except Exception as exc:
-            _LOGGER.error("Failed to refresh token: %s", exc)
+            _LOGGER.error("Error updating state: %s", exc)
+        return False
 
-    async def async_send_command_to_client(self, command: str):
-        """Send a mower command to the Indego client."""
-        _LOGGER.debug("Sending command to mower (%s): '%s'", self._serial, command)
-        await self._indego_client.put_command(command)
-
-    def _create_entities(self, device_info):
-        """Create sub-entities and add them to Hass."""
-
-        _LOGGER.debug("Creating entities")
-
-        for entity_key, entity in ENTITY_DEFINITIONS.items():
-            if entity[CONF_TYPE] == SENSOR_TYPE:
-                self.entities[entity_key] = IndegoSensor(
-                    f"indego_{entity_key}",
-                    f"{self._mower_name} {entity[CONF_NAME]}",
-                    entity[CONF_ICON],
-                    entity[CONF_DEVICE_CLASS],
-                    entity[CONF_UNIT_OF_MEASUREMENT],
-                    entity[CONF_ATTR],
-                    device_info,
-                    translation_key=entity[CONF_TRANSLATION_KEY] if CONF_TRANSLATION_KEY in entity else None,
-                )
-                if entity_key == ENTITY_SERIAL_NUMBER:
-                    # Avoid scheduling a state update before the entity is
-                    # added to Home Assistant by setting the protected
-                    # attribute directly.
-                    self.entities[entity_key]._state = self._serial
-                elif entity_key == ENTITY_API_ERRORS:
-                    # Initialize API error counter with zero
-                    self.entities[entity_key]._state = 0
-                    # Avoid scheduling a state update before the entity is
-                    # added to Home Assistant. Attributes will be set once
-                    # the entity is registered, so disable sync here.
-                    self.entities[entity_key].set_attributes({}, sync_state=False)
-
-            elif entity[CONF_TYPE] == BINARY_SENSOR_TYPE:
-                self.entities[entity_key] = IndegoBinarySensor(
-                    f"indego_{entity_key}",
-                    f"{self._mower_name} {entity[CONF_NAME]}",
-                    entity[CONF_ICON],
-                    entity[CONF_DEVICE_CLASS],
-                    entity[CONF_ATTR],
-                    device_info,
-                    translation_key=entity[CONF_TRANSLATION_KEY] if CONF_TRANSLATION_KEY in entity else None,
-                )
-
-            elif entity[CONF_TYPE] == LAWN_MOWER_TYPE:
-                if self._features[CONF_EXPOSE_INDEGO_AS_MOWER]:
-                    self.entities[entity_key] = IndegoLawnMower(
-                        "indego",
-                        self._mower_name,
-                        device_info,
-                        self
+    async def _async_update_generic_data(self):
+        """Update generic data using the API manager."""
+        try:
+            data = await self.api.get_generic_data()
+            if data:
+                self._battery_percent = data.battery.percent
+                self._battery_percent_adjusted = data.battery.percent_adjusted
+                self._runtime = data.runtime
+                # Update device info if needed
+                if not self.device_info:
+                    self.device_info = DeviceInfo(
+                        identifiers={(DOMAIN, self.serial)},
+                        manufacturer="Bosch",
+                        model=data.model,
+                        name=self.name,
+                        sw_version=data.firmware,
                     )
+                return True
+        except Exception as exc:
+            _LOGGER.error("Error updating generic data: %s", exc)
+        return False
 
-            elif entity[CONF_TYPE] == VACUUM_TYPE:
-                if self._features[CONF_EXPOSE_INDEGO_AS_VACUUM]:
-                    self.entities[entity_key] = IndegoVacuum(
-                        "indego",
-                        self._mower_name,
-                        device_info,
-                        self
-                    )
+    async def update_alerts(self):
+        """Update alerts using the API manager."""
+        try:
+            alerts = await self.api.get_alerts()
+            if alerts:
+                self.alerts = alerts
+                self.alerts_count = len(alerts)
+                return True
+        except Exception as exc:
+            _LOGGER.error("Error updating alerts: %s", exc)
+        return False
 
-            elif entity[CONF_TYPE] == CAMERA_TYPE:
-                if entity_key == ENTITY_CAMERA:
-                    self.entities[entity_key] = IndegoMapCamera(
-                        "indego",
-                        self._mower_name,
-                        device_info,
-                        self,
-                    )
-                else:
-                    self.entities[entity_key] = IndegoCamera(
-                        "indego_progress",
-                        self._mower_name,
-                        device_info,
-                        self,
-                    )
+    async def update_operating_data(self):
+        """Update operating data using the API manager."""
+        try:
+            data = await self.api.get_operating_data()
+            if data:
+                return True
+        except Exception as exc:
+            _LOGGER.error("Error updating operating data: %s", exc)
+        return False
 
-    async def update_generic_data_and_load_platforms(self, load_platforms):
-        """Update the generic mower data, so we can create the HA platforms for the Indego component."""
-        _LOGGER.debug("Getting generic data for device info.")
-        generic_data = await self._update_generic_data()
+    async def update_next_mow(self):
+        """Update next mow using the API manager."""
+        try:
+            self._next_mow = await self.api.get_next_mow()
+            return True
+        except Exception as exc:
+            _LOGGER.error("Error updating next mow: %s", exc)
+        return False
 
-        device_info = DeviceInfo(
-            identifiers={(DOMAIN, self._serial)},
-            manufacturer="Bosch",
-            name=self._mower_name,
-            model=generic_data.bareToolnumber if generic_data else None,
-            sw_version=generic_data.alm_firmware_version if generic_data else None,
-        )
+    async def update_last_completed_mow(self):
+        """Update last completed mow using the API manager."""
+        try:
+            self._last_completed = await self.api.get_last_completed_mow()
+            return True
+        except Exception as exc:
+            _LOGGER.error("Error updating last completed mow: %s", exc)
+        return False
 
-        self._create_entities(device_info)
-        await load_platforms()
+    async def update_all(self):
+        """Update all states using the API manager."""
+        try:
+            await self.api.update_all()
+            return True
+        except Exception as exc:
+            _LOGGER.error("Error updating all states: %s", exc)
+        return False
 
-        if self._hass.state == CoreState.running:
-            # HA has already been started (this probably an integration reload).
-            # Perform initial update right away...
-            self._hass.async_create_task(self._initial_update())
+    async def start_periodic_position_update(self):
+        """Start periodic position update."""
+        # Only start if we want position updates
+        if self._position_update_interval > 0:
+            if self._adaptive_position_updates:
+                await self._adaptive_position_update()
+            else:
+                await self._fixed_position_update()
 
-        else:
-            # HA is still starting, delay the initial update...
-            self._hass.bus.async_listen_once(
-                EVENT_HOMEASSISTANT_STARTED, self._initial_update
+    async def _fixed_position_update(self):
+        """Update position on fixed interval."""
+        if not self._shutdown:
+            await self._async_update_state(True)
+            self._position_update_timer = async_track_point_in_time(
+                self.hass,
+                self._fixed_position_update,
+                utcnow() + timedelta(minutes=self._position_update_interval)
             )
 
-        self._hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, self.async_shutdown)
+    async def _adaptive_position_update(self):
+        """Update position adaptively based on state."""
+        if not self._shutdown:
+            is_mowing = self._mower_state in [1, 2, 3]
+            interval = 1 if is_mowing else self._position_update_interval
+            
+            await self._async_update_state(True)
+            self._position_update_timer = async_track_point_in_time(
+                self.hass,
+                self._adaptive_position_update,
+                utcnow() + timedelta(minutes=interval)
+            )
 
-    async def _initial_update(self, _=None):
-        """Do the initial update and create all entities."""
-        _LOGGER.debug("Starting initial update.")
-
-        self.set_online_state(False)
-        await self._create_refresh_state_task()
-        await asyncio.gather(*[self.refresh_10m(), self.refresh_24h()])
-
-        try:
-            _LOGGER.debug("Refreshing initial operating data.")
-            await self._update_operating_data()
-        except Exception:
-            _LOGGER.exception("Initial call to _update_operating_data failed")
-
-    async def async_shutdown(self, _=None):
-        """Remove all future updates, cancel tasks and close the client."""
-        if self._shutdown:
-            return
-
-        _LOGGER.debug("Starting shutdown.")
+    async def async_shutdown(self):
+        """Shut down the hub."""
         self._shutdown = True
+        if self._position_update_timer:
+            self._position_update_timer()
+        await self._async_client.close()
 
-        # Cancel token refresh task
-        if self._token_refresh_task and not self._token_refresh_task.done():
-            self._token_refresh_task.cancel()
-            try:
-                await self._token_refresh_task
-            except asyncio.CancelledError:
-                pass
-            self._token_refresh_task = None
+    async def update_generic_data_and_load_platforms(self, load_platforms: Callable):
+        """Update generic data and load platforms."""
+        await self._async_update_generic_data()
+        await load_platforms()
+        self.generic_data_loaded = True
 
-        self._cancel_delayed_refresh_state()
+    async def handle_command(call):
+        """Handle commands sent to the mower."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        command = call.data.get(CONF_SEND_COMMAND)
 
-        if self._refresh_state_task:
-            self._refresh_state_task.cancel()
-            await self._refresh_state_task
-            self._refresh_state_task = None
-
-        if self._refresh_10m_remover:
-            self._refresh_10m_remover()
-
-        if self._refresh_24h_remover:
-            self._refresh_24h_remover()
-
-        if self._unsub_map_timer:
-            self._unsub_map_timer()
-            self._unsub_map_timer = None
-
-        await self._indego_client.close()
-        _LOGGER.debug("Shutdown finished.")
-
-    async def refresh_state(self):
-        """Update the state, if necessary update operating data and recall itself."""
-        _LOGGER.debug("Refreshing state.")
-        self._cancel_delayed_refresh_state()
-
-        update_failed = False
-        try:
-            await self._update_state(longpoll=(self._update_fail_count is None or self._update_fail_count == 0))
-            self._update_fail_count = 0
-            mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
-            if mower_state == "unknown":
-                if self._last_state_ts is None:
-                    _LOGGER.debug(
-                        "Received unknown state for %s on initial update – refreshing",
-                        self._serial,
-                    )
-                else:
-                    _LOGGER.warning(
-                        "Received unknown state for %s, last success at %s – refreshing",
-                        self._serial,
-                        self._last_state_ts,
-                    )
-                try:
-                    await self._update_state(longpoll=False)
-                except Exception as exc:  # noqa: BLE001
-                    update_failed = True
-                    _LOGGER.warning(
-                        "Retry after unknown state failed for %s: %s",
-                        self._serial,
-                        str(exc),
-                    )
-
-        except Exception as exc:
-            update_failed = True
-            _LOGGER.warning(
-                "Mower state update failed for %s, reason: %s",
-                self._serial,
-                str(exc),
-            )
-            self.set_online_state(False)
-
-        if self._shutdown:
-            return
-
-        if update_failed:
-            if self._update_fail_count is None:
-                self._update_fail_count = 1
-            _LOGGER.debug("Delaying next status update with %i seconds due to previous failure...", STATUS_UPDATE_FAILURE_DELAY_TIME[self._update_fail_count])
-            when = datetime.now() + timedelta(seconds=STATUS_UPDATE_FAILURE_DELAY_TIME[self._update_fail_count])
-            self._update_fail_count = min(self._update_fail_count + 1, len(STATUS_UPDATE_FAILURE_DELAY_TIME) - 1)
-            self._unsub_refresh_state = async_track_point_in_time(self._hass, self._create_refresh_state_task, when)
-            return
-
-        if self._indego_client.state is not None:
-            state = self._indego_client.state.state
-            if (500 <= state <= 799) or (state in (257, 260)):
-                try:
-                    _LOGGER.debug("Refreshing operating data.")
-                    await self._update_operating_data()
-
-                except Exception as exc:
-                    _LOGGER.warning(
-                        "Mower operating data update failed for %s, reason: %s",
-                        self._serial,
-                        str(exc),
-                    )
-
-            if self._indego_client.state.error != self._latest_alert:
-                self._latest_alert = self._indego_client.state.error
-                try:
-                    _LOGGER.debug("Refreshing alerts, to get new alert.")
-                    await self._update_alerts()
-
-                except Exception as exc:
-                    _LOGGER.warning(
-                        "Mower alerts update failed for %s, reason: %s",
-                        self._serial,
-                        str(exc),
-                    )
-
-        await self._create_refresh_state_task()
-
-    async def _create_refresh_state_task(self, event=None):
-        """Create a task to refresh the mower state."""
-        self._refresh_state_task = self._hass.async_create_task(self.refresh_state())
-
-    def _cancel_delayed_refresh_state(self):
-        """Cancel a delayed refresh state callback (if any exists)."""
-        if self._unsub_refresh_state is None:
-            return
-
-        self._unsub_refresh_state()
-        self._unsub_refresh_state = None
-
-    def _apply_pending_state(self, _=None):
-        """Apply a debounced mower state update."""
-        self._debounce_remover = None
-        if self._pending_mower_state is None:
-            return
-
-        state, detail = self._pending_mower_state
-        self._pending_mower_state = None
-        self._pending_mower_detail = None
-
-        self.entities[ENTITY_MOWER_STATE].state = state
-        self.entities[ENTITY_MOWER_STATE_DETAIL].state = detail
-
-        self.entities[ENTITY_MOWER_STATE].add_attributes({"last_updated": last_updated_now()})
-        self.entities[ENTITY_MOWER_STATE_DETAIL].add_attributes(
-            {
-                "last_updated": last_updated_now(),
-                "state_number": self._indego_client.state.state,
-                "state_description": detail,
-            }
-        )
-
-        self._last_state_ts = last_updated_now()
-
-    def _schedule_state_update(self, state: str, detail: str) -> None:
-        """Schedule a debounced mower state update."""
-        self._pending_mower_state = state
-        self._pending_mower_detail = detail
-        if self._debounce_remover is not None:
-            self._debounce_remover()
-        self._debounce_remover = async_call_later(
-            self._hass, STATE_DEBOUNCE_SECONDS, self._apply_pending_state
-        )
-
-    def _warn_once(self, msg: str, *args) -> None:
-        """Log a warning only if more than 60 seconds passed since last time."""
-        key = msg % args if args else msg
-        now = time.time()
-        last = self._last_error.get(key)
-        if last is None or now - last > 60:
-            _LOGGER.warning(msg, *args)
-            self._last_error[key] = now
-
-    def _log_api_error(self, err_type: str, msg: str, exc: Exception | None = None) -> None:
-        """Log stack traces throttled per error type and count occurrences."""
-        info = self._error_log.get(err_type, {"last": 0, "count": 0})
-        now = time.time()
-        if now - info["last"] > API_ERROR_LOG_INTERVAL:
-            if info["count"]:
-                _LOGGER.warning("%s occurred %i more times", err_type, info["count"])
-            if exc is not None:
-                _LOGGER.exception(msg)
-            else:
-                _LOGGER.warning(msg)
-            info = {"last": now, "count": 0}
+        if serial is None:
+            _LOGGER.debug("No serial defined, getting all indego hubs")
+            targets = hass.data[DOMAIN].values()
         else:
-            info["count"] += 1
-        self._error_log[err_type] = info
-        self._api_error_stats[err_type] = self._api_error_stats.get(err_type, 0) + 1
+            _LOGGER.debug("Serial defined, getting single hub")
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
 
-    def _in_cooldown(self) -> bool:
-        """Return True if requests are currently rate limited."""
-        return time.time() < self._next_request_ts
+        if not targets:
+            _LOGGER.warning("No hubs found for command")
+            return
 
-    def _handle_rate_limit(self, exc: ClientResponseError) -> None:
-        """Process HTTP 429 errors and set cooldown."""
-        retry_after = exc.headers.get("Retry-After") if exc.headers else None
-        delay = RETRY_AFTER_DEFAULT
-        if retry_after:
+        for target in targets:
+            _LOGGER.debug("Sending command to %s", target.serial)
             try:
-                delay = int(retry_after)
-            except ValueError:
-                try:
-                    delay_dt = parsedate_to_datetime(retry_after)
-                    delay = max(0, (delay_dt - datetime.utcnow()).total_seconds())
-                except Exception:  # noqa: BLE001
-                    delay = RETRY_AFTER_DEFAULT
-        self._next_request_ts = time.time() + delay
-        self._warn_once(
-            "Rate limit reached for %s, delaying API calls for %s seconds",
-            self._serial,
-            int(delay),
-        )
-
-    def _handle_api_error(self, exc: Exception, context: str) -> None:
-        """Handle API errors with specific responses for different HTTP status codes."""
-        if isinstance(exc, ClientResponseError):
-            if exc.status == 403:
-                self._log_api_error(
-                    "forbidden",
-                    f"Access forbidden for {self._serial} during {context}. Please check your credentials.",
-                    exc
-                )
-                self.set_online_state(False)
-            elif exc.status == 429:
-                self._handle_rate_limit(exc)
-            elif exc.status == 500:
-                self._log_api_error(
-                    "server_error",
-                    f"Bosch server error for {self._serial} during {context}. Please try again later.",
-                    exc
-                )
-            else:
-                self._log_api_error(
-                    f"http_{exc.status}",
-                    f"HTTP {exc.status} error for {self._serial} during {context}: {exc.message}",
-                    exc
-                )
-        elif isinstance(exc, asyncio.TimeoutError):
-            self._log_api_error(
-                "timeout",
-                f"Request timeout for {self._serial} during {context}",
-                exc
-            )
-        else:
-            self._log_api_error(
-                "other",
-                f"Unexpected error for {self._serial} during {context}: {str(exc)}",
-                exc
-            )
-
-    def _should_retry(self, exc: Exception, attempt: int, max_retries: int = 3) -> tuple[bool, float]:
-        """Determine if request should be retried and calculate delay.
-        
-        Args:
-            exc: The exception that occurred
-            attempt: The current attempt number (0-based)
-            max_retries: Maximum number of retries allowed
-
-        Returns:
-            tuple[bool, float]: (should_retry, delay_seconds)
-        """
-        # Don't retry if we've hit the max retries
-        if attempt >= max_retries:
-            return False, 0
-
-        # Don't retry on authentication failures or bad requests
-        if isinstance(exc, ClientResponseError):
-            if exc.status in (401, 403, 400):
-                return False, 0
-            
-            # For rate limits, use the server-provided delay
-            if exc.status == 429:
-                retry_after = exc.headers.get("Retry-After") if exc.headers else None
-                if retry_after:
-                    try:
-                        # Handle both delta-seconds and HTTP-date formats
-                        try:
-                            delay = float(retry_after)
-                        except ValueError:
-                            delay_dt = parsedate_to_datetime(retry_after)
-                            delay = max(0, (delay_dt - datetime.utcnow()).total_seconds())
-                        return True, delay
-                    except (ValueError, TypeError):
-                        pass
-
-        # Calculate exponential backoff with jitter
-        base_delay = min(300, 2 ** attempt)  # Cap at 5 minutes
-        jitter = random.uniform(0, 0.1 * base_delay)  # 10% jitter
-        delay = base_delay + jitter
-
-        # Determine if we should retry based on the error type
-        should_retry = False
-        if isinstance(exc, (asyncio.TimeoutError, ClientConnectorError)):
-            # Always retry on network errors
-            should_retry = True
-        elif isinstance(exc, ClientResponseError):
-            # Retry on server errors and specific client errors
-            should_retry = (
-                exc.status >= 500  # Server errors
-                or exc.status in {408, 429}  # Request timeout, Too many requests
-            )
-
-        return should_retry, delay
-
-    async def _retry_request(self, operation: str, func: Callable, *args, **kwargs) -> Any:
-        """Execute an API request with retries and exponential backoff.
-        
-        Args:
-            operation: Description of the operation being performed
-            func: Async function to call
-            *args: Positional arguments for func
-            **kwargs: Keyword arguments for func
-            
-        Returns:
-            Any: Result from the function call
-            
-        Raises:
-            Exception: The last error encountered after all retries are exhausted
-        """
-        max_retries = 3
-        attempt = 0
-        last_exc = None
-
-        while True:
-            try:
-                # Wait for any rate limit cooldown before making the request
-                if self._in_cooldown():
-                    await asyncio.sleep(max(0, self._next_request_ts - time.time()))
-                
-                return await func(*args, **kwargs)
-                
+                await target.api.put_command(command)
             except Exception as exc:
-                last_exc = exc
-                should_retry, delay = self._should_retry(exc, attempt, max_retries)
-                
-                if not should_retry:
-                    self._handle_api_error(exc, operation)
-                    raise
-
-                attempt += 1
-                _LOGGER.debug(
-                    "Retrying %s after %.1f seconds (attempt %d/%d) due to: %s",
-                    operation,
-                    delay,
-                    attempt,
-                    max_retries,
-                    str(exc),
-                )
-                await asyncio.sleep(delay)
-
-    async def refresh_10m(self, _=None):
-        """Refresh Indego sensors every 10m."""
-        _LOGGER.debug("Refreshing 10m.")
-
-        results = await asyncio.gather(
-            *[
-                self._update_generic_data(),
-                self._update_alerts(),
-                self._update_last_completed_mow(),
-                self._update_next_mow(),
-                self._update_forecast(),
-            ],
-            return_exceptions=True,
-        )
-
-        next_refresh = 600
-        for index, res in enumerate(results):
-            if res and isinstance(res, BaseException):
-                try:
-                    raise res
-                except Exception as exc:
-                    _LOGGER.warning(
-                        "Error %s for index %i while performing 10m update for %s",
-                        str(exc),
-                        index,
-                        self._serial,
-                    )
-        await self._update_api_error_sensor()
-
-        self._refresh_10m_remover = async_call_later(
-            self._hass, next_refresh, self.refresh_10m
-        )
-
-    async def refresh_24h(self, _=None):
-        """Refresh Indego sensors every 24h."""
-        _LOGGER.debug("Refreshing 24h.")
-
-        try:
-            await self._update_updates_available()
-
-        except Exception as exc:
-            _LOGGER.warning(
-                "Error %s while performing 24h update for %s", str(exc), self._serial
-            )
-
-        self._refresh_24h_remover = async_call_later(self._hass, 86400, self.refresh_24h)
-
-    def map_path(self):
-        return f"/config/www/indego_map_{self._serial}.svg"
-
-    async def download_and_store_map(self) -> None:
-        """Download the current map from the mower and save it locally."""
-        _LOGGER.debug("Starting map download for %s", self._serial)
-        
-        try:
-            svg_bytes = await self._api.download_map()
-            if not svg_bytes:
-                _LOGGER.warning("No map data received from API for %s", self._serial)
-                return
-                
-            path = self.map_path()
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            
-            try:
-                async with aiofiles.open(path, "wb") as f:
-                    await f.write(svg_bytes)
-                _LOGGER.info("Map saved successfully in %s (%d bytes)", path, len(svg_bytes))
-                
-                # Notify any entities that need to refresh their maps
-                for entity in self.entities.values():
-                    if hasattr(entity, "map_updated"):
-                        await entity.map_updated()
-                        
-            except OSError as exc:
                 _LOGGER.error(
-                    "Error saving the map file for %s: %s",
-                    self._serial,
-                    str(exc),
+                    "Command '%s' failed on %s: %s",
+                    command,
+                    target.serial,
+                    str(exc)
                 )
-        except Exception as exc:
-            _LOGGER.error("Failed to download map for %s: %s", self._serial, str(exc))
 
-    async def start_periodic_position_update(self, interval: int | None = None):
-        if interval is None:
-            interval = self._position_interval
+    async def handle_smartmow(call):
+        """Handle smart mow commands."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        enable = call.data.get(CONF_SMARTMOWING)
 
-        if self._unsub_map_timer:
-            self._unsub_map_timer()
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
 
-        self._current_position_interval = interval
-        self._unsub_map_timer = async_track_time_interval(
-            self._hass, self._check_position_and_state, timedelta(seconds=interval)
-        )
-
-    async def _check_position_and_state(self, now):
-        """Check mower position and state with retry logic."""
-        if self._in_cooldown():
-            _LOGGER.debug(
-                "Skipping position update for %s due to cooldown", self._serial
-            )
+        if not targets:
+            _LOGGER.warning("No hubs found for smartmow command")
             return
 
+        for target in targets:
+            try:
+                await target.api.put_mow_mode({"enabled": enable == "on"})
+            except Exception as exc:
+                _LOGGER.error(
+                    "Smartmow command failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_delete_alert(call):
+        """Handle delete alert commands."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        alert_index = call.data.get(SERVER_DATA_ALERT_INDEX)
+
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for delete alert command")
+            return
+
+        for target in targets:
+            try:
+                await target.api.delete_alert(alert_index)
+            except Exception as exc:
+                _LOGGER.error(
+                    "Delete alert failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_delete_alert_all(call):
+        """Handle delete all alerts command."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for delete all alerts command")
+            return
+
+        for target in targets:
+            try:
+                await target.api.delete_all_alerts()
+            except Exception as exc:
+                _LOGGER.error(
+                    "Delete all alerts failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_read_alert(call):
+        """Handle read alert command."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+        alert_index = call.data.get(SERVER_DATA_ALERT_INDEX)
+
+        if serial is None:
+            targets = hass.data[DOMAIN].values()
+        else:
+            targets = [
+                hub
+                for hub in hass.data[DOMAIN].values()
+                if hub.serial == serial
+            ]
+
+        if not targets:
+            _LOGGER.warning("No hubs found for read alert command")
+            return
+
+        for target in targets:
+            try:
+                await target.api.put_alert_read(alert_index)
+            except Exception as exc:
+                _LOGGER.error(
+                    "Read alert failed on %s: %s",
+                    target.serial,
+                    str(exc)
+                )
+
+    async def handle_download_map(call):
+        """Handle map download."""
+        serial = call.data.get(CONF_MOWER_SERIAL)
+
+        if serial is None:
+            _LOGGER.error("Serial number required for map download")
+            return
+
+        targets = [
+            hub
+            for hub in hass.data[DOMAIN].values()
+            if hub.serial == serial
+        ]
+
+        if not targets:
+            _LOGGER.warning("No hub found for map download")
+            return
+
+        target = targets[0]
         try:
-            # Use the new API method that combines state and position update
-            await self._api.get_state(force=True)
-            state = self._indego_client.state
-            
-            if not state:
-                _LOGGER.warning("Received invalid state from mower")
-                return
-
-            mower_state = getattr(state, "mower_state", "unknown")
-            if mower_state == "unknown":
-                _LOGGER.warning("Received unknown mower state")
-                return
-
-            # Update position if available
-            xpos = getattr(state, "svg_xPos", None)
-            ypos = getattr(state, "svg_yPos", None)
-            
-            if xpos is not None and ypos is not None:
-                if (xpos, ypos) != self._last_position:
-                    _LOGGER.debug("Position changed: x=%s, y=%s", xpos, ypos)
-                    self._last_position = (xpos, ypos)
-                    # Trigger map refresh for relevant entities
-                    for entity in self.entities.values():
-                        if hasattr(entity, "refresh_map"):
-                            await entity.refresh_map(mower_state)
-
-            # Adjust update interval based on mower state if adaptive updates are enabled
-            if self._adaptive_updates:
-                desired_interval = (
-                    60 if mower_state == "docked" else self._position_interval
-                )
-                if desired_interval != self._current_position_interval:
-                    await self.start_periodic_position_update(desired_interval)
-
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-            else:
-                _LOGGER.warning(
-                    "Position update failed for %s: HTTP %s - %s",
-                    self._serial,
-                    exc.status,
-                    exc.message,
-                )
-        except asyncio.TimeoutError:
-            _LOGGER.warning(
-                "Position update timed out for %s", self._serial
-            )
+            await target.download_and_save_map()
         except Exception as exc:
-            _LOGGER.warning(
-                "Position update failed for %s: %s",
-                self._serial,
+            _LOGGER.error(
+                "Map download failed for %s: %s",
+                target.serial,
                 str(exc)
             )
 
-    async def _update_operating_data(self):
-        if self._in_cooldown():
-            _LOGGER.debug(
-                "Skipping operating data update for %s due to cooldown", self._serial
-            )
-            return
+    # Register all service handlers
+    hass.services.async_register(
+        DOMAIN, SERVICE_NAME_COMMAND, handle_command, schema=SERVICE_SCHEMA_COMMAND
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_SMARTMOW,
+        handle_smartmow,
+        schema=SERVICE_SCHEMA_SMARTMOWING,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_DELETE_ALERT,
+        handle_delete_alert,
+        schema=SERVICE_SCHEMA_DELETE_ALERT,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_DELETE_ALERT_ALL,
+        handle_delete_alert_all,
+        schema=SERVICE_SCHEMA_DELETE_ALERT_ALL,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_READ_ALERT,
+        handle_read_alert,
+        schema=SERVICE_SCHEMA_READ_ALERT,
+    )
+    hass.services.async_register(
+        DOMAIN,
+        SERVICE_NAME_DOWNLOAD_MAP,
+        handle_download_map,
+        schema=SERVICE_SCHEMA_DOWNLOAD_MAP,
+    )
+
+    async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Unload config entry."""
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, INDEGO_PLATFORMS)
+    if unload_ok:
+        indego_hub = hass.data[DOMAIN][entry.entry_id]
+        await indego_hub.async_shutdown()
+        hass.data[DOMAIN].pop(entry.entry_id)
+
+        # Unregister services if this was the last entry
+        if not hass.data[DOMAIN]:
+            for service in [
+                SERVICE_NAME_COMMAND,
+                SERVICE_NAME_SMARTMOW,
+                SERVICE_NAME_DELETE_ALERT,
+                SERVICE_NAME_DELETE_ALERT_ALL,
+                SERVICE_NAME_READ_ALERT,
+            ]:
+                hass.services.async_remove(DOMAIN, service)
+
+    return unload_ok
+
+    async def download_and_save_map(self, filename: str = None) -> bool:
+        """Download the map from the mower and save it."""
         try:
-            await self._indego_client.update_operating_data()
-        except (asyncio.TimeoutError, asyncio.CancelledError) as exc:
-            self._log_api_error(
-                "timeout",
-                "Timeout while updating operating data for %s. This usually means the mower did not respond in time: %s" % (self._serial, exc),
-                exc,
-            )
-            return
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            _LOGGER.warning(
-                "Failed to update operating data for %s: HTTP %s - %s",
-                self._serial,
-                exc.status,
-                exc.message,
-            )
-            return
-        except Exception as exc:  # noqa: BLE001
-            self._log_api_error(
-                "other",
-                "Failed to update operating data for %s: %s" % (self._serial, exc),
-                exc,
-            )
-            return
+            if filename is None:
+                filename = f"map_{self.serial}_{int(time.time())}.svg"
+                
+            # Use the API manager to download the map
+            success = await self.api.download_map(filename)
+            
+            if success:
+                self.map_filename = filename
+                self.map_update_timestamp = utcnow()
+                try:
+                    # Read and parse the SVG
+                    async with aiofiles.open(filename, mode='r') as f:
+                        content = await f.read()
+                        svg = fromstring(content)
+                        self.map_image = svg
+                        return True
+                except Exception as exc:
+                    _LOGGER.error("Failed to parse downloaded map: %s", exc)
+                    return False
+            else:
+                _LOGGER.error("Failed to download map")
+                return False
 
-        _LOGGER.debug("Updating operating data")
-        if self._indego_client.operating_data:
-            self.entities[ENTITY_BATTERY].state = self._indego_client.operating_data.battery.percent_adjusted
-
-            if ENTITY_VACUUM in self.entities:
-                self.entities[ENTITY_VACUUM].battery_level = self._indego_client.operating_data.battery.percent_adjusted
-
-            self.entities[ENTITY_GARDEN_SIZE].state = self._indego_client.operating_data.garden.size
-
-            self.entities[ENTITY_AMBIENT_TEMP].state = (
-                self._indego_client.operating_data.battery.ambient_temp
-            )
-            self.entities[ENTITY_BATTERY_TEMP].state = (
-                self._indego_client.operating_data.battery.battery_temp
-            )
-
-            self.entities[ENTITY_BATTERY].add_attributes(
-                {
-                    "last_updated": last_updated_now(),
-                    "voltage_V": self._indego_client.operating_data.battery.voltage,
-                    "discharge_Ah": self._indego_client.operating_data.battery.discharge,
-                    "cycles": self._indego_client.operating_data.battery.cycles,
-                    f"battery_temp_{UnitOfTemperature.CELSIUS}": self._indego_client.operating_data.battery.battery_temp,
-                    f"ambient_temp_{UnitOfTemperature.CELSIUS}": self._indego_client.operating_data.battery.ambient_temp,
-                }
-            )
-
-            runtime = self._indego_client.operating_data.runtime
-            self.entities[ENTITY_TOTAL_OPERATION_TIME].state = runtime.total.operate
-            self.entities[ENTITY_TOTAL_MOWING_TIME].state = runtime.total.cut
-            self.entities[ENTITY_TOTAL_CHARGING_TIME].state = runtime.total.charge
-
-            self.entities[ENTITY_BATTERY_CYCLES].state = self._indego_client.operating_data.battery.cycles
-
-            if runtime.session.operate:
-                sessions = runtime.total.operate / (runtime.session.operate / 60)
-                if sessions:
-                    avg = runtime.total.cut / sessions
-                    self.entities[ENTITY_AVERAGE_MOW_TIME].state = round(avg * 60, 1)
-            if hasattr(self, "_weekly_area_entries"):
-                total_area = sum(float(a) for t, a in self._weekly_area_entries)
-                self.entities[ENTITY_WEEKLY_AREA].state = total_area
-
-    def set_online_state(self, online: bool):
-        _LOGGER.debug("Set online state: %s", online)
-
-        if online:
-            self._offline_since = None
-            self._offline_failures = 0
-        else:
-            now = time.monotonic()
-            if self._offline_since is None:
-                self._offline_since = now
-            self._offline_failures += 1
-            if (
-                self._offline_failures < 2
-                and now - self._offline_since < OFFLINE_GRACE_PERIOD
-            ):
-                _LOGGER.debug(
-                    "Suppressing transient offline state (%s fails)",
-                    self._offline_failures,
-                )
-                return
-            if self._debounce_remover is not None:
-                self._debounce_remover()
-                self._debounce_remover = None
-                self._pending_mower_state = None
-                self._pending_mower_detail = None
-
-        if self._online == online:
-            return
-
-        self._online = online
-        self.entities[ENTITY_ONLINE].state = online
-        self.entities[ENTITY_MOWER_STATE].set_cloud_connection_state(online)
-        self.entities[ENTITY_MOWER_STATE_DETAIL].set_cloud_connection_state(online)
-
-        if ENTITY_VACUUM in self.entities:
-            self.entities[ENTITY_VACUUM].set_cloud_connection_state(online)
-
-        if ENTITY_LAWN_MOWER in self.entities:
-            self.entities[ENTITY_LAWN_MOWER].set_cloud_connection_state(online)
-
-    async def _update_state(self, longpoll: bool = True):
-        """Update the mower state."""
-        try:
-            await self._api.get_state(longpoll=longpoll)
-            self.set_online_state(self._indego_client.online)
-            self._schedule_state_update(
-                self._indego_client.state_description,
-                self._indego_client.state_description_detail,
-            )
         except Exception as exc:
-            self._handle_api_error(exc, "state update")
-            self.set_online_state(False)
-            raise exc
-
-    async def _update_operating_data(self):
-        """Update the operating data."""
-        try:
-            await self._api.get_operating_data()
-            if self._indego_client.operating_data:
-                self._update_operating_data_entities()
-        except Exception as exc:
-            self._handle_api_error(exc, "operating data update")
-
-    async def _update_alerts(self):
-        """Update the alerts."""
-        try:
-            await self._api.get_alerts()
-            self._update_alert_entities()
-        except Exception as exc:
-            self._handle_api_error(exc, "alerts update")
-
-    async def _update_next_mow(self):
-        """Update the next mow schedule."""
-        try:
-            await self._api.get_next_mow()
-            if self._indego_client.next_mow:
-                self._update_next_mow_entities()
-        except Exception as exc:
-            _LOGGER.warning("Failed to update next mow: %s", str(exc))
-
-    async def _update_last_completed_mow(self):
-        """Update the last completed mow."""
-        try:
-            await self._api.get_last_completed_mow()
-            if self._indego_client.last_completed_mow:
-                self._update_last_completed_entities()
-        except Exception as exc:
-            _LOGGER.warning("Failed to update last completed mow: %s", str(exc))
-
-    async def _update_generic_data(self):
-        """Update the generic data."""
-        try:
-            result = await self._api.get_generic_data()
-            if self._indego_client.generic_data:
-                self._update_generic_data_entities()
-            return result
-        except Exception as exc:
-            _LOGGER.warning("Failed to update generic data: %s", str(exc))
-            return None
-
-    def _update_operating_data_entities(self):
-        """Update entity states from operating data."""
-        data = self._indego_client.operating_data
-        if not data:
-            return
-
-        self.entities[ENTITY_BATTERY].state = data.battery.percent_adjusted
-        if ENTITY_VACUUM in self.entities:
-            self.entities[ENTITY_VACUUM].battery_level = data.battery.percent_adjusted
-
-        self.entities[ENTITY_GARDEN_SIZE].state = data.garden.size
-        self.entities[ENTITY_AMBIENT_TEMP].state = data.battery.ambient_temp
-        self.entities[ENTITY_BATTERY_TEMP].state = data.battery.battery_temp
-
-        self.entities[ENTITY_BATTERY].add_attributes(
-            {
-                "last_updated": last_updated_now(),
-                "voltage_V": data.battery.voltage,
-                "discharge_Ah": data.battery.discharge,
-                "cycles": data.battery.cycles,
-                f"battery_temp_{UnitOfTemperature.CELSIUS}": data.battery.battery_temp,
-                f"ambient_temp_{UnitOfTemperature.CELSIUS}": data.battery.ambient_temp,
-            }
-        )
-
-        runtime = data.runtime
-        self.entities[ENTITY_TOTAL_OPERATION_TIME].state = runtime.total.operate
-        self.entities[ENTITY_TOTAL_MOWING_TIME].state = runtime.total.cut
-        self.entities[ENTITY_TOTAL_CHARGING_TIME].state = runtime.total.charge
-        self.entities[ENTITY_BATTERY_CYCLES].state = data.battery.cycles
-
-        if runtime.session.operate:
-            sessions = runtime.total.operate / (runtime.session.operate / 60)
-            if sessions:
-                avg = runtime.total.cut / sessions
-                self.entities[ENTITY_AVERAGE_MOW_TIME].state = round(avg * 60, 1)
-
-    def _update_alert_entities(self):
-        """Update entity states from alerts data."""
-        self.entities[ENTITY_ALERT].state = self._indego_client.alerts_count > 0
-
-        if self._indego_client.alerts:
-            attributes = {
-                "alerts_count": self._indego_client.alerts_count,
-                "last_alert_error_code": self._indego_client.alerts[0].error_code,
-                "last_alert_message": self._indego_client.alerts[0].message,
-                "last_alert_date": format_indego_date(self._indego_client.alerts[0].date),
-                "last_alert_read": self._indego_client.alerts[0].read_status,
-            }
-
-            if self._features[CONF_SHOW_ALL_ALERTS]:
-                for index, alert in enumerate(self._indego_client.alerts):
-                    attributes[f"alert_{index}"] = f"{format_indego_date(alert.date)}: {alert.message}"
-
-            self.entities[ENTITY_ALERT].set_attributes(attributes)
+            _LOGGER.error("Error downloading map: %s", exc)
+            return False

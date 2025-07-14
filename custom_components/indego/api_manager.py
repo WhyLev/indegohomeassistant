@@ -1,20 +1,33 @@
 """API Manager for Indego integration."""
+from datetime import datetime, timedelta
 import asyncio
 import logging
 import time
-from datetime import datetime, timedelta
+import random
 from typing import Any, Dict, Optional
 
+from aiohttp.client_exceptions import (
+    ClientResponseError,
+    ClientError,
+    ServerTimeoutError,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from aiohttp.client_exceptions import ClientResponseError
+from homeassistant.const import ATTR_NAME
+
+from .const import (
+    API_ERROR_LOG_INTERVAL,
+    DEFAULT_STATE_UPDATE_TIMEOUT,
+    DEFAULT_LONGPOLL_TIMEOUT,
+)
+from pyIndego import IndegoAsyncClient
 
 _LOGGER = logging.getLogger(__name__)
 
 class IndegoApiManager:
     """Class to manage API calls with caching and rate limiting."""
 
-    def __init__(self, hass: HomeAssistant, api_client: Any):
+    def __init__(self, hass: HomeAssistant, api_client: IndegoAsyncClient):
         """Initialize the API manager."""
         self.hass = hass
         self.api_client = api_client
@@ -34,11 +47,119 @@ class IndegoApiManager:
         self._last_error_time: Dict[str, float] = {}
         self._error_count: Dict[str, int] = {}
         self._lock = asyncio.Lock()
+        self._retry_count: Dict[str, int] = {}
+        self._max_retries = 5 
+        self._min_retry_delay = 1
+        self._max_retry_delay = 60
+        self._backoff_factor = 2
+        self._request_timeout = 30
+
+    async def _handle_request(self, request_key: str, request_func, *args, **kwargs) -> Any:
+        """Handle an API request with retries, rate limiting and caching."""
+        async with self._lock:
+            # Check cache first
+            if self.is_cache_valid(request_key):
+                return self._cache.get(request_key)
+
+            # Wait for rate limiting
+            await self.wait_for_rate_limit()
+
+            retry_count = 0
+            last_exception = None
+
+            while retry_count <= self._max_retries:
+                try:
+                    # Ensure token is valid before request
+                    await self.api_client.start()
+
+                    # Make the request
+                    result = await request_func(*args, **kwargs)
+
+                    # Update cache
+                    self._cache[request_key] = result
+                    self._cache_times[request_key] = datetime.now()
+                    self._retry_count[request_key] = 0
+                    self._error_count[request_key] = 0
+
+                    return result
+
+                except (ClientResponseError, ServerTimeoutError) as exc:
+                    last_exception = exc
+                    status = getattr(exc, 'status', 0)
+                    
+                    # Handle specific status codes
+                    if status == 403:  # Forbidden - token likely expired
+                        await self.api_client.start()  # Force token refresh
+                    elif status == 429:  # Too many requests
+                        retry_delay = float(exc.headers.get('Retry-After', self._min_retry_delay))
+                        await asyncio.sleep(retry_delay)
+                    elif status == 500:  # Server error
+                        retry_count += 1
+                        retry_delay = self._calculate_retry_delay(retry_count)
+                        await asyncio.sleep(retry_delay)
+                    else:
+                        retry_count += 1
+                        retry_delay = self._calculate_retry_delay(retry_count)
+                        await asyncio.sleep(retry_delay)
+
+                except Exception as exc:
+                    last_exception = exc
+                    retry_count += 1
+                    retry_delay = self._calculate_retry_delay(retry_count)
+                    _LOGGER.warning(
+                        "Request failed for %s: %s. Retrying in %.1f seconds (attempt %d/%d)",
+                        request_key, exc, retry_delay, retry_count, self._max_retries
+                    )
+                    await asyncio.sleep(retry_delay)
+
+            # If we get here, all retries failed
+            self._error_count[request_key] = self._error_count.get(request_key, 0) + 1
+            _LOGGER.error(
+                "Request failed for %s after %d retries: %s",
+                request_key, self._max_retries, last_exception
+            )
+            raise last_exception
+
+    def _calculate_retry_delay(self, retry_count: int) -> float:
+        """Calculate exponential backoff delay with jitter."""
+        delay = min(
+            self._min_retry_delay * (self._backoff_factor ** retry_count),
+            self._max_retry_delay
+        )
+        # Add jitter between 75% and 100% of delay
+        return delay * (0.75 + (0.25 * random.random()))
+
+    async def check_token(self):
+        """Check if token needs refresh and refresh if needed."""
+        if not hasattr(self.api_client, 'token_refresh_method'):
+            return
+            
+        if not hasattr(self.api_client, 'valid_token'):
+            return
+            
+        try:
+            if not self.api_client.valid_token:
+                _LOGGER.debug("Token expired, requesting refresh")
+                await self.api_client.start()
+        except Exception as exc:
+            _LOGGER.error("Error refreshing token: %s", exc)
+            raise
+
+    async def ensure_token_valid(self):
+        """Ensure the token is valid before making a request."""
+        await self.check_token()
+        
+        # Add pre-request validation
+        if not self.api_client or not hasattr(self.api_client, '_session'):
+            raise RuntimeError("API client not properly initialized")
 
     def _clean_old_timestamps(self):
         """Remove timestamps older than 1 minute."""
         current_time = time.time()
-        self._request_timestamps = [t for t in self._request_timestamps if current_time - t <= 60]
+        self._request_timestamps = [
+            t for t in self._request_timestamps 
+            if current_time - t <= 60
+        ]
 
     def can_make_request(self) -> bool:
         """Check if we can make a new request based on rate limits."""
@@ -48,189 +169,137 @@ class IndegoApiManager:
     async def wait_for_rate_limit(self):
         """Wait until we can make another request."""
         while not self.can_make_request():
-            await asyncio.sleep(0.1)
-            self._clean_old_timestamps()
+            await asyncio.sleep(1)
         self._request_timestamps.append(time.time())
 
     def is_cache_valid(self, cache_key: str) -> bool:
         """Check if cached data is still valid."""
         if cache_key not in self._cache_times:
             return False
+            
         ttl = self._cache_ttl.get(cache_key, timedelta(minutes=5))
         return datetime.now() - self._cache_times[cache_key] < ttl
 
-    async def _make_api_call(self, cache_key: str, api_method: str, *args, **kwargs):
-        """Make an API call with caching and rate limiting."""
-        async with self._lock:
-            # Check cache first
-            if self.is_cache_valid(cache_key):
-                return self._cache[cache_key]
+    async def get_state(self, force: bool = False, longpoll: bool = False) -> Any:
+        """Get the state from the mower."""
+        return await self._handle_request(
+            'state',
+            self.api_client.get_state,
+            force=force,
+            longpoll=longpoll
+        )
 
-            # Wait for rate limiting
-            await self.wait_for_rate_limit()
+    async def get_generic_data(self) -> Any:
+        """Get the generic data from the mower."""
+        return await self._handle_request(
+            'generic_data',
+            self.api_client.get_generic_data
+        )
 
-            try:
-                # Make the API call
-                method = getattr(self.api_client, api_method)
-                result = await method(*args, **kwargs)
+    async def get_alerts(self) -> Any:
+        """Get the alerts from the mower."""
+        return await self._handle_request(
+            'alerts',
+            self.api_client.get_alerts
+        )
 
-                # Update cache
-                self._cache[cache_key] = result
-                self._cache_times[cache_key] = datetime.now()
+    async def get_operating_data(self) -> Any:
+        """Get the operating data from the mower."""
+        return await self._handle_request(
+            'operating_data',
+            self.api_client.get_operating_data
+        )
 
-                # Reset error count on success
-                self._error_count[cache_key] = 0
+    async def get_next_mow(self) -> Any:
+        """Get the next mow schedule."""
+        return await self._handle_request(
+            'next_mow',
+            self.api_client.get_next_mow
+        )
 
-                return result
+    async def get_last_completed_mow(self) -> Any:
+        """Get the last completed mow."""
+        return await self._handle_request(
+            'last_completed_mow',
+            self.api_client.get_last_completed_mow
+        )
 
-            except ClientResponseError as exc:
-                if exc.status == 429:  # Too Many Requests
-                    _LOGGER.warning("Rate limit hit, backing off for 60 seconds")
-                    await asyncio.sleep(60)
-                    return await self._make_api_call(cache_key, api_method, *args, **kwargs)
-                
-                self._handle_error(cache_key, exc)
-                raise
+    async def get_predictive_calendar(self) -> Any:
+        """Get the predictive calendar."""
+        return await self._handle_request(
+            'predictive_calendar',
+            self.api_client.get_predictive_calendar
+        )
 
-            except Exception as exc:
-                self._handle_error(cache_key, exc)
-                raise
+    async def put_command(self, command: str) -> Any:
+        """Send a command to the mower."""
+        return await self._handle_request(
+            f'command_{command}',
+            self.api_client.put_command,
+            command
+        )
 
-    def _handle_error(self, cache_key: str, exc: Exception):
-        """Handle and track errors."""
-        current_time = time.time()
-        if cache_key not in self._error_count:
-            self._error_count[cache_key] = 0
+    async def put_mow_mode(self, command: Any) -> Any:
+        """Set the mow mode."""
+        return await self._handle_request(
+            f'mow_mode_{command}',
+            self.api_client.put_mow_mode,
+            command
+        )
 
-        # Only log if we haven't logged in the last minute
-        if current_time - self._last_error_time.get(cache_key, 0) > 60:
-            self._last_error_time[cache_key] = current_time
-            self._error_count[cache_key] += 1
-            _LOGGER.error(
-                "Error making API call %s (attempt %d): %s",
-                cache_key,
-                self._error_count[cache_key],
-                str(exc)
+    async def download_map(self, filename: str = None) -> bool:
+        """Download the map from the mower."""
+        try:
+            return await self._handle_request(
+                'download_map',
+                self.api_client.download_map,
+                filename
             )
+        except Exception as exc:
+            _LOGGER.error("Failed to download map: %s", exc)
+            return False
 
-    async def get_state(self, force: bool = False, longpoll: bool = False):
-        """Get the mower state with caching."""
-        if force:
-            self._cache.pop('state', None)
-            self._cache_times.pop('state', None)
-        return await self._make_api_call('state', 'update_state', longpoll=longpoll)
+    async def update_all(self) -> None:
+        """Update all states from the API."""
+        try:
+            await self._handle_request(
+                'update_all',
+                self.api_client.update_all
+            )
+        except Exception as exc:
+            _LOGGER.error("Failed to update all states: %s", exc)
 
-    async def get_operating_data(self):
-        """Get operating data with caching."""
-        return await self._make_api_call('operating_data', 'update_operating_data')
+    async def delete_alert(self, alert_index: int) -> bool:
+        """Delete an alert."""
+        try:
+            return await self._handle_request(
+                f'delete_alert_{alert_index}',
+                self.api_client.delete_alert,
+                alert_index
+            )
+        except Exception as exc:
+            _LOGGER.error("Failed to delete alert: %s", exc)
+            return False
 
-    async def get_next_mow(self):
-        """Get next mow time with caching."""
-        return await self._make_api_call('next_mow', 'update_next_mow')
+    async def put_alert_read(self, alert_index: int) -> bool:
+        """Mark an alert as read."""
+        try:
+            return await self._handle_request(
+                f'put_alert_read_{alert_index}',
+                self.api_client.put_alert_read,
+                alert_index
+            )
+        except Exception as exc:
+            _LOGGER.error("Failed to mark alert as read: %s", exc)
+            return False
 
-    async def get_last_completed_mow(self):
-        """Get last completed mow with caching."""
-        return await self._make_api_call('last_completed_mow', 'update_last_completed_mow')
-
-    async def get_alerts(self):
-        """Get alerts with caching."""
-        return await self._make_api_call('alerts', 'update_alerts')
-
-    async def get_generic_data(self):
-        """Get generic data with caching."""
-        return await self._make_api_call('generic_data', 'update_generic_data')
-
-    async def get_predictive_calendar(self):
-        """Get predictive calendar with caching."""
-        return await self._make_api_call('predictive_calendar', 'update_predictive_calendar')
-
-    def invalidate_cache(self, cache_key: Optional[str] = None):
-        """Invalidate specific or all cache entries."""
-        if cache_key is None:
-            self._cache.clear()
-            self._cache_times.clear()
-        elif cache_key in self._cache:
-            del self._cache[cache_key]
-            del self._cache_times[cache_key]
-
-    async def download_map(self, max_retries: int = 3, retry_delay: int = 5) -> Optional[bytes]:
-        """Download the map from the API with retries and validation.
-        
-        Args:
-            max_retries: Maximum number of retry attempts
-            retry_delay: Delay in seconds between retries
-            
-        Returns:
-            Optional[bytes]: The map data if successful, None if failed
-        """
-        async with self._lock:  # Ensure only one map download at a time
-            attempt = 0
-            last_error = None
-            
-            while attempt < max_retries:
-                try:
-                    # Check rate limiting
-                    await self.wait_for_rate_limit()
-                    
-                    # Try to get state first to ensure mower is responsive
-                    await self.get_state(force=True)
-                    if not self.api_client.state:
-                        _LOGGER.warning("Cannot download map: mower state unavailable")
-                        return None
-                    
-                    # Download the map
-                    _LOGGER.debug("Downloading map (attempt %d/%d)", attempt + 1, max_retries)
-                    map_data = await self.api_client.download_map()
-                    
-                    # Validate map data
-                    if not map_data:
-                        raise ValueError("Received empty map data")
-                        
-                    if not map_data.startswith(b'<?xml') and not map_data.startswith(b'<svg'):
-                        raise ValueError("Invalid map data format")
-                        
-                    # Add timestamp to rate limiting
-                    self._request_timestamps.append(time.time())
-                    
-                    _LOGGER.debug("Map downloaded successfully (%d bytes)", len(map_data))
-                    return map_data
-                    
-                except (ClientResponseError, asyncio.TimeoutError) as exc:
-                    last_error = exc
-                    if isinstance(exc, ClientResponseError):
-                        if exc.status == 404:
-                            _LOGGER.warning("Map not found on server")
-                            return None
-                        if exc.status == 429:  # Rate limited
-                            retry_delay = int(exc.headers.get('Retry-After', retry_delay))
-                            
-                    _LOGGER.warning(
-                        "Map download failed (attempt %d/%d): %s. Retrying in %d seconds...",
-                        attempt + 1,
-                        max_retries,
-                        str(exc),
-                        retry_delay
-                    )
-                    
-                except Exception as exc:
-                    last_error = exc
-                    _LOGGER.warning(
-                        "Unexpected error downloading map (attempt %d/%d): %s",
-                        attempt + 1,
-                        max_retries,
-                        str(exc)
-                    )
-                
-                # Wait before retrying
-                await asyncio.sleep(retry_delay)
-                attempt += 1
-                # Increase delay for next attempt
-                retry_delay = min(retry_delay * 2, 60)  # Cap at 60 seconds
-            
-            if last_error:
-                _LOGGER.error(
-                    "Failed to download map after %d attempts. Last error: %s",
-                    max_retries,
-                    str(last_error)
-                )
-            return None
+    async def delete_all_alerts(self) -> bool:
+        """Delete all alerts."""
+        try:
+            return await self._handle_request(
+                'delete_all_alerts',
+                self.api_client.delete_all_alerts
+            )
+        except Exception as exc:
+            _LOGGER.error("Failed to delete all alerts: %s", exc)
+            return False
