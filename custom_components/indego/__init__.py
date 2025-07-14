@@ -1,793 +1,94 @@
-"""Component for integrating a Bosch Indego lawn mower."""
+"""The Bosch Indego integration."""
+from __future__ import annotations
+
 import asyncio
 import logging
-import os
-import random
-import time
-from datetime import datetime, timedelta
-from email.utils import parsedate_to_datetime
-from typing import Any, Callable
+from datetime import timedelta
+from typing import Any
 
-import aiofiles
-from aiohttp.client_exceptions import ClientConnectorError, ClientResponseError
-from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
-from homeassistant.core import CoreState, HomeAssistant
-from homeassistant.helpers import device_registry
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.event import (
-    async_call_later,
-    async_track_point_in_time,
-    async_track_time_interval,
-)
-import homeassistant.util.dt
-import voluptuous as vol
-from homeassistant.exceptions import HomeAssistantError, ConfigEntryAuthFailed
+import async_timeout
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import (
-    CONF_DEVICE_CLASS,
-    CONF_ICON,
-    CONF_ID,
-    CONF_NAME,
-    CONF_TYPE,
-    CONF_UNIT_OF_MEASUREMENT,
-    EVENT_HOMEASSISTANT_STARTED,
-    EVENT_HOMEASSISTANT_STOP,
-    STATE_ON,
-    STATE_UNKNOWN,
-    UnitOfTemperature,
+from homeassistant.const import Platform
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers import aiohttp_client
+from homeassistant.helpers.typing import ConfigType
+from homeassistant.helpers.update_coordinator import (
+    CoordinatorEntity,
+    DataUpdateCoordinator,
 )
-from homeassistant.components.binary_sensor import BinarySensorDeviceClass
-from homeassistant.components.sensor import SensorDeviceClass
-from homeassistant.helpers import config_validation as cv
-from homeassistant.helpers.event import async_call_later
-from homeassistant.util.dt import utcnow
-from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.config_entry_oauth2_flow import async_get_config_entry_implementation
-from homeassistant.helpers.event import async_track_point_in_time
-from homeassistant.helpers.event import async_track_time_interval
 
-from svgutils.transform import fromstring
-
-from .api import IndegoOAuth2Session
-from .binary_sensor import IndegoBinarySensor
-from .vacuum import IndegoVacuum
-from .lawn_mower import IndegoLawnMower
-from .const import *
-from .sensor import IndegoSensor
-from .camera import IndegoCamera, IndegoMapCamera
-from .api_manager import IndegoApiManager
-from .pyindego.indego_async_client import IndegoAsyncClient
+from .api import IndegoApiClient
+from .const import (
+    DOMAIN,
+    INDEGO_PLATFORMS,
+    UPDATE_INTERVAL,
+    CONF_MOWER_SERIAL,
+    DEFAULT_NAME,
+)
+from .coordinator import IndegoDataUpdateCoordinator
+from .models import State, Calendar, OperatingData
 
 _LOGGER = logging.getLogger(__name__)
 
-SERVICE_SCHEMA_COMMAND = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string,
-    vol.Required(CONF_SEND_COMMAND): cv.string
-})
 
-SERVICE_SCHEMA_SMARTMOWING = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string,
-    vol.Required(CONF_SMARTMOWING): cv.string
-})
-
-SERVICE_SCHEMA_DELETE_ALERT = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string,
-    vol.Required(SERVER_DATA_ALERT_INDEX): cv.positive_int
-})
-
-SERVICE_SCHEMA_DELETE_ALERT_ALL = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string
-})
-
-SERVICE_SCHEMA_READ_ALERT = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string,
-    vol.Required(SERVER_DATA_ALERT_INDEX): cv.positive_int
-})
-
-SERVICE_SCHEMA_READ_ALERT_ALL = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string
-})
-
-SERVICE_SCHEMA_DOWNLOAD_MAP = vol.Schema({
-    vol.Required(CONF_MOWER_SERIAL): cv.string
-})
-
-SERVICE_SCHEMA_REFRESH = vol.Schema({
-    vol.Optional(CONF_MOWER_SERIAL): cv.string
-})
-
-
-def FUNC_ICON_MOWER_ALERT(state):
-    if state:
-        if int(state) > 0 or state == STATE_ON:
-            return "mdi:alert-outline"
-    return "mdi:check-circle-outline"
-
-
-ENTITY_DEFINITIONS = {
-    ENTITY_ONLINE: {
-        CONF_TYPE: BINARY_SENSOR_TYPE,
-        CONF_NAME: "online",
-        CONF_ICON: "mdi:cloud-check",
-        CONF_DEVICE_CLASS: BinarySensorDeviceClass.CONNECTIVITY,
-        CONF_ATTR: [],
-    },
-    ENTITY_UPDATE_AVAILABLE: {
-        CONF_TYPE: BINARY_SENSOR_TYPE,
-        CONF_NAME: "update available",
-        CONF_ICON: "mdi:download-outline",
-        CONF_DEVICE_CLASS: BinarySensorDeviceClass.UPDATE,
-        CONF_ATTR: [],
-    },
-    ENTITY_ALERT: {
-        CONF_TYPE: BINARY_SENSOR_TYPE,
-        CONF_NAME: "alert",
-        CONF_ICON: FUNC_ICON_MOWER_ALERT,
-        CONF_DEVICE_CLASS: BinarySensorDeviceClass.PROBLEM,
-        CONF_ATTR: ["alerts_count"],
-        CONF_TRANSLATION_KEY: "indego_alert",
-    },
-    ENTITY_MOWER_STATE: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "mower state",
-        CONF_ICON: "mdi:robot-mower-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: ["last_updated"],
-        CONF_TRANSLATION_KEY: "mower_state",
-    },
-    ENTITY_MOWER_STATE_DETAIL: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "mower state detail",
-        CONF_ICON: "mdi:robot-mower-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [
-            "last_updated",
-            "state_number",
-            "state_description",
-        ],
-        CONF_TRANSLATION_KEY: "mower_state_detail",
-    },
-    ENTITY_BATTERY: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "battery %",
-        CONF_ICON: "battery",
-        CONF_DEVICE_CLASS: SensorDeviceClass.BATTERY,
-        CONF_UNIT_OF_MEASUREMENT: "%",
-        CONF_ATTR: [
-            "last_updated",
-            "voltage_V",
-            "discharge_Ah",
-            "cycles",
-            f"battery_temp_{UnitOfTemperature.CELSIUS}",
-            f"ambient_temp_{UnitOfTemperature.CELSIUS}",
-        ],
-    },
-    ENTITY_AMBIENT_TEMP: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "ambient temperature",
-        CONF_ICON: "mdi:thermometer",
-        CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE,
-        CONF_UNIT_OF_MEASUREMENT: UnitOfTemperature.CELSIUS,
-        CONF_ATTR: [],
-    },
-    ENTITY_BATTERY_TEMP: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "battery temperature",
-        CONF_ICON: "mdi:thermometer",
-        CONF_DEVICE_CLASS: SensorDeviceClass.TEMPERATURE,
-        CONF_UNIT_OF_MEASUREMENT: UnitOfTemperature.CELSIUS,
-        CONF_ATTR: [],
-    },
-    ENTITY_LAWN_MOWED: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "lawn mowed",
-        CONF_ICON: "mdi:grass",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "%",
-        CONF_ATTR: [
-            "last_updated",
-            "last_completed_mow",
-            "next_mow",
-            "last_session_operation_min",
-            "last_session_cut_min",
-            "last_session_charge_min",
-        ],
-    },
-    ENTITY_LAST_COMPLETED: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "last completed",
-        CONF_ICON: "mdi:calendar-check",
-        CONF_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [],
-    },
-    ENTITY_NEXT_MOW: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "next mow",
-        CONF_ICON: "mdi:calendar-clock",
-        CONF_DEVICE_CLASS: SensorDeviceClass.TIMESTAMP,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [],
-    },
-    ENTITY_FORECAST: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "forecast",
-        CONF_ICON: "mdi:weather-partly-cloudy",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: ["rain_probability", "recommended_next_mow"],
-    },
-    ENTITY_BATTERY_CYCLES: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "battery cycles",
-        CONF_ICON: "mdi:counter",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [],
-    },
-    ENTITY_AVERAGE_MOW_TIME: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "average mow time",
-        CONF_ICON: "mdi:timer-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "min",
-        CONF_ATTR: [],
-    },
-    ENTITY_WEEKLY_AREA: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "weekly mowed area",
-        CONF_ICON: "mdi:chart-areaspline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "m²",
-        CONF_ATTR: [],
-    },
-    ENTITY_API_ERRORS: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "api errors",
-        CONF_ICON: "mdi:alert-circle-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [],
-    },
-    ENTITY_MOWING_MODE: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "mowing mode",
-        CONF_ICON: "mdi:alpha-m-circle-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [],
-    },
-    ENTITY_RUNTIME: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "mowtime total",
-        CONF_ICON: "mdi:information-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "h",
-        CONF_ATTR: [
-            "total_mowing_time_h",
-            "total_charging_time_h",
-            "total_operation_time_h",
-        ],
-    },
-    ENTITY_TOTAL_MOWING_TIME: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "total mowing time",
-        CONF_ICON: "mdi:clock-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "h",
-        CONF_ATTR: [],
-    },
-    ENTITY_TOTAL_CHARGING_TIME: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "total charging time",
-        CONF_ICON: "mdi:clock-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "h",
-        CONF_ATTR: [],
-    },
-    ENTITY_TOTAL_OPERATION_TIME: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "total operation time",
-        CONF_ICON: "mdi:clock-outline",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "h",
-        CONF_ATTR: [],
-    },
-    ENTITY_VACUUM: {
-        CONF_TYPE: VACUUM_TYPE,
-    },
-    ENTITY_LAWN_MOWER: {
-        CONF_TYPE: LAWN_MOWER_TYPE,
-    },
-    ENTITY_GARDEN_SIZE: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "garden size",
-        CONF_ICON: "mdi:ruler-square",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: "m²",
-        CONF_ATTR: [],
-    },
-    ENTITY_FIRMWARE: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "firmware version",
-        CONF_ICON: "mdi:chip",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [],
-    },
-    ENTITY_SERIAL_NUMBER: {
-        CONF_TYPE: SENSOR_TYPE,
-        CONF_NAME: "serial number",
-        CONF_ICON: "mdi:identifier",
-        CONF_DEVICE_CLASS: None,
-        CONF_UNIT_OF_MEASUREMENT: None,
-        CONF_ATTR: [],
-    },
-    ENTITY_CAMERA: {
-        CONF_TYPE: CAMERA_TYPE,
-    },
-    ENTITY_CAMERA_PROGRESS: {
-        CONF_TYPE: CAMERA_TYPE,
-    },
-}
-
-
-def format_indego_date(date: datetime) -> str:
-    return date.astimezone().strftime("%Y-%m-%d %H:%M:%S")
-
-
-def last_updated_now() -> str:
-    return homeassistant.util.dt.as_local(utcnow()).strftime(
-        "%Y-%m-%d %H:%M:%S"
-    )
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Set up the Indego component."""
+    hass.data.setdefault(DOMAIN, {})
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Load a config entry."""
-    hass.data.setdefault(DOMAIN, {})
+    """Set up Indego from a config entry."""
+    try:
+        # Get OAuth session
+        session = aiohttp_client.async_get_clientsession(hass)
+        
+        # Initialize API client
+        api = IndegoApiClient(
+            hass=hass,
+            token=entry.data["token"]["access_token"],
+            token_refresh_method=entry.data.get("token_refresh_method"),
+            serial=entry.data[CONF_MOWER_SERIAL],
+        )
 
-    entry_implementation = await async_get_config_entry_implementation(hass, entry)
-    oauth_session = IndegoOAuth2Session(hass, entry, entry_implementation)
-    indego_hub = hass.data[DOMAIN][entry.entry_id] = IndegoHub(
-        entry.data[CONF_MOWER_NAME],
-        oauth_session,
-        entry.data[CONF_MOWER_SERIAL],
-        {
-            CONF_EXPOSE_INDEGO_AS_MOWER: entry.options.get(CONF_EXPOSE_INDEGO_AS_MOWER, False),
-            CONF_EXPOSE_INDEGO_AS_VACUUM: entry.options.get(CONF_EXPOSE_INDEGO_AS_VACUUM, False),
-            CONF_SHOW_ALL_ALERTS: entry.options.get(CONF_SHOW_ALL_ALERTS, False),
-        },
-        hass,
-        entry.options.get(CONF_USER_AGENT),
-        entry.options.get(CONF_POSITION_UPDATE_INTERVAL, DEFAULT_POSITION_UPDATE_INTERVAL),
-        entry.options.get(CONF_ADAPTIVE_POSITION_UPDATES, DEFAULT_ADAPTIVE_POSITION_UPDATES),
-        entry.options.get(CONF_PROGRESS_LINE_WIDTH, MAP_PROGRESS_LINE_WIDTH),
-        entry.options.get(CONF_PROGRESS_LINE_COLOR, MAP_PROGRESS_LINE_COLOR),
-        entry.options.get(CONF_STATE_UPDATE_TIMEOUT, DEFAULT_STATE_UPDATE_TIMEOUT),
-        entry.options.get(CONF_LONGPOLL_TIMEOUT, DEFAULT_LONGPOLL_TIMEOUT)
-    )
+        # Initialize coordinator
+        coordinator = IndegoDataUpdateCoordinator(
+            hass=hass,
+            api=api,
+            update_interval=UPDATE_INTERVAL,
+        )
 
-    await indego_hub.start_periodic_position_update()
+        # Fetch initial data
+        await coordinator.async_config_entry_first_refresh()
 
-    async def handle_command(call):
-        """Handle commands sent to the mower."""
-        serial = call.data.get(CONF_MOWER_SERIAL)
-        command = call.data.get(CONF_SEND_COMMAND)
+        hass.data[DOMAIN][entry.entry_id] = {
+            "api": api,
+            "coordinator": coordinator,
+        }
 
-        if serial is None:
-            _LOGGER.debug("No serial defined, getting all indego hubs")
-            targets = hass.data[DOMAIN].values()
-        else:
-            _LOGGER.debug("Serial defined, getting single hub")
-            targets = [
-                hub
-                for hub in hass.data[DOMAIN].values()
-                if hub.serial == serial
-            ]
-
-        if not targets:
-            _LOGGER.warning("No hubs found for command")
-            return
-
-        for target in targets:
-            _LOGGER.debug("Sending command to %s", target.serial)
-            try:
-                await target.api.put_command(command)
-            except Exception as exc:
-                _LOGGER.error(
-                    "Command '%s' failed on %s: %s",
-                    command,
-                    target.serial,
-                    str(exc)
-                )
-
-    async def handle_smartmow(call):
-        """Handle smart mow commands."""
-        serial = call.data.get(CONF_MOWER_SERIAL)
-        enable = call.data.get(CONF_SMARTMOWING)
-
-        if serial is None:
-            targets = hass.data[DOMAIN].values()
-        else:
-            targets = [
-                hub
-                for hub in hass.data[DOMAIN].values()
-                if hub.serial == serial
-            ]
-
-        if not targets:
-            _LOGGER.warning("No hubs found for smartmow command")
-            return
-
-        for target in targets:
-            try:
-                await target.api.put_mow_mode({"enabled": enable == "on"})
-            except Exception as exc:
-                _LOGGER.error(
-                    "Smartmow command failed on %s: %s",
-                    target.serial,
-                    str(exc)
-                )
-
-    async def handle_delete_alert(call):
-        """Handle delete alert commands."""
-        serial = call.data.get(CONF_MOWER_SERIAL)
-        alert_index = call.data.get(SERVER_DATA_ALERT_INDEX)
-
-        if serial is None:
-            targets = hass.data[DOMAIN].values()
-        else:
-            targets = [
-                hub
-                for hub in hass.data[DOMAIN].values()
-                if hub.serial == serial
-            ]
-
-        if not targets:
-            _LOGGER.warning("No hubs found for delete alert command")
-            return
-
-        for target in targets:
-            try:
-                await target.api.delete_alert(alert_index)
-            except Exception as exc:
-                _LOGGER.error(
-                    "Delete alert failed on %s: %s",
-                    target.serial,
-                    str(exc)
-                )
-
-    async def handle_delete_alert_all(call):
-        """Handle delete all alerts command."""
-        serial = call.data.get(CONF_MOWER_SERIAL)
-
-        if serial is None:
-            targets = hass.data[DOMAIN].values()
-        else:
-            targets = [
-                hub
-                for hub in hass.data[DOMAIN].values()
-                if hub.serial == serial
-            ]
-
-        if not targets:
-            _LOGGER.warning("No hubs found for delete all alerts command")
-            return
-
-        for target in targets:
-            try:
-                await target.api.delete_all_alerts()
-            except Exception as exc:
-                _LOGGER.error(
-                    "Delete all alerts failed on %s: %s",
-                    target.serial,
-                    str(exc)
-                )
-
-    async def handle_read_alert(call):
-        """Handle read alert command."""
-        serial = call.data.get(CONF_MOWER_SERIAL)
-        alert_index = call.data.get(SERVER_DATA_ALERT_INDEX)
-
-        if serial is None:
-            targets = hass.data[DOMAIN].values()
-        else:
-            targets = [
-                hub
-                for hub in hass.data[DOMAIN].values()
-                if hub.serial == serial
-            ]
-
-        if not targets:
-            _LOGGER.warning("No hubs found for read alert command")
-            return
-
-        for target in targets:
-            try:
-                await target.api.put_alert_read(alert_index)
-            except Exception as exc:
-                _LOGGER.error(
-                    "Read alert failed on %s: %s",
-                    target.serial,
-                    str(exc)
-                )
-
-    async def handle_download_map(call):
-        """Handle map download."""
-        serial = call.data.get(CONF_MOWER_SERIAL)
-
-        if serial is None:
-            _LOGGER.error("Serial number required for map download")
-            return
-
-        targets = [
-            hub
-            for hub in hass.data[DOMAIN].values()
-            if hub.serial == serial
-        ]
-
-        if not targets:
-            _LOGGER.warning("No hub found for map download")
-            return
-
-        target = targets[0]
-        try:
-            await target.download_and_save_map()
-        except Exception as exc:
-            _LOGGER.error(
-                "Map download failed for %s: %s",
-                target.serial,
-                str(exc)
-            )
-
-    # Register all service handlers
-    hass.services.async_register(
-        DOMAIN, SERVICE_NAME_COMMAND, handle_command, schema=SERVICE_SCHEMA_COMMAND
-    )
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_NAME_SMARTMOW,
-        handle_smartmow,
-        schema=SERVICE_SCHEMA_SMARTMOWING,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_NAME_DELETE_ALERT,
-        handle_delete_alert,
-        schema=SERVICE_SCHEMA_DELETE_ALERT,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_NAME_DELETE_ALERT_ALL,
-        handle_delete_alert_all,
-        schema=SERVICE_SCHEMA_DELETE_ALERT_ALL,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_NAME_READ_ALERT,
-        handle_read_alert,
-        schema=SERVICE_SCHEMA_READ_ALERT,
-    )
-    hass.services.async_register(
-        DOMAIN,
-        SERVICE_NAME_DOWNLOAD_MAP,
-        handle_download_map,
-        schema=SERVICE_SCHEMA_DOWNLOAD_MAP,
-    )
-
-    async def load_platforms():
-        _LOGGER.debug("Loading platforms")
+        # Set up platforms
         await hass.config_entries.async_forward_entry_setups(entry, INDEGO_PLATFORMS)
 
-    try:
-        await indego_hub.update_generic_data_and_load_platforms(load_platforms)
+        return True
 
-    except ClientResponseError as exc:
-        if 400 <= exc.status < 500:
-            _LOGGER.debug("Received 401, triggering ConfigEntryAuthFailed in HA...")
-            raise ConfigEntryAuthFailed from exc
-
-        _LOGGER.warning("Login unsuccessful: %s", str(exc))
-        return False
-
-    except AttributeError as exc:
-        _LOGGER.warning("Login unsuccessful: %s", str(exc))
-        return False
-
-    return True
-
-    def find_instance_for_mower_service_call(call):
-        mower_serial = call.data.get(CONF_MOWER_SERIAL, None)
-        if mower_serial is None:
-            # Return the first instance when params is missing for backwards compatibility.
-            return hass.data[DOMAIN][hass.data[DOMAIN][CONF_SERVICES_REGISTERED]]
-
-        for config_entry_id in hass.data[DOMAIN]:
-            if config_entry_id == CONF_SERVICES_REGISTERED:
-                continue
-
-            instance = hass.data[DOMAIN][config_entry_id]
-            if instance.serial == mower_serial:
-                return instance
-
-        raise HomeAssistantError("No mower instance found for serial '%s'" % mower_serial)
-
-    async def async_send_command(call):
-        """Handle the mower command service call."""
-        instance = find_instance_for_mower_service_call(call)
-        command = call.data.get(CONF_SEND_COMMAND, DEFAULT_NAME_COMMANDS)
-        _LOGGER.debug("Indego.send_command service called, with command: %s", command)
-
-        await instance.async_send_command_to_client(command)
-
-    async def async_send_smartmowing(call):
-        """Handle the smartmowing service call."""
-        instance = find_instance_for_mower_service_call(call)
-        enable = call.data.get(CONF_SMARTMOWING, DEFAULT_NAME_COMMANDS)
-        _LOGGER.debug("Indego.send_smartmowing service called, enable: %s", enable)
-
-        try:
-            await instance._api.get_state(force=True)  # Ensure we have latest state
-            await instance._indego_client.set_smart_mowing(enable == "on")
-            await instance._api.get_generic_data(force=True)  # Force refresh generic data
-        except Exception as exc:
-            _LOGGER.error("Failed to set smart mowing mode: %s", str(exc))
-            raise
-
-    async def async_delete_alert(call):
-        """Handle the service call."""
-        instance = find_instance_for_mower_service_call(call)
-        index = call.data.get(SERVER_DATA_ALERT_INDEX, DEFAULT_NAME_COMMANDS)
-        _LOGGER.debug("Indego.delete_alert service called with alert index: %s", index)
-
-        try:
-            await instance._api.get_alerts()  # Get latest alerts first
-            await instance._indego_client.delete_alert(index)
-            # Force refresh alerts after deletion
-            instance._api.invalidate_cache('alerts')
-            await instance._api.get_alerts()
-        except Exception as exc:
-            _LOGGER.error("Failed to delete alert: %s", str(exc))
-            raise
-
-    async def async_delete_alert_all(call):
-        """Handle the service call."""
-        instance = find_instance_for_mower_service_call(call)
-        _LOGGER.debug("Indego.delete_alert_all service called")
-
-        try:
-            await instance._api.get_alerts()  # Get latest alerts first
-            await instance._indego_client.delete_all_alerts()
-            # Force refresh alerts after deletion
-            instance._api.invalidate_cache('alerts')
-            await instance._api.get_alerts()
-        except Exception as exc:
-            _LOGGER.error("Failed to delete all alerts: %s", str(exc))
-            raise
-
-    async def async_read_alert(call):
-        """Handle the service call."""
-        instance = find_instance_for_mower_service_call(call)
-        index = call.data.get(SERVER_DATA_ALERT_INDEX, DEFAULT_NAME_COMMANDS)
-        _LOGGER.debug("Indego.read_alert service called with alert index: %s", index)
-
-        await instance._update_alerts()
-        await instance._indego_client.put_alert_read(index)
-        await instance._update_alerts()
-
-    async def async_read_alert_all(call):
-        """Handle the service call."""
-        instance = find_instance_for_mower_service_call(call)
-        _LOGGER.debug("Indego.read_alert_all service called")
-
-        await instance._update_alerts()
-        await instance._indego_client.put_all_alerts_read()
-        await instance._update_alerts()
-
-    async def async_download_map(call):
-        """Handle the download_map service call."""
-        instance = find_instance_for_mower_service_call(call)
-        _LOGGER.debug("Indego.download_map service called for serial: %s", instance.serial)
-        await instance.download_and_store_map()
-
-    async def async_refresh(call):
-        """Handle the refresh service call."""
-        instance = find_instance_for_mower_service_call(call)
-        if instance._unsub_refresh_state is not None:
-            _LOGGER.debug("Refresh skipped due to cooldown for serial: %s", instance.serial)
-            return
-        _LOGGER.debug("Indego.refresh service called for serial: %s", instance.serial)
-        await asyncio.gather(
-            instance.refresh_state(),
-            instance.refresh_10m(),
-            instance.refresh_24h(),
-        )
-
-    # In HASS we can have multiple Indego component instances as long as the mower serial is unique.
-    # So the mower services should only need to be registered for the first instance.
-    if CONF_SERVICES_REGISTERED not in hass.data[DOMAIN]:
-        _LOGGER.debug("Initializing mower service for config entry '%s'", entry.entry_id)
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_NAME_COMMAND,
-            async_send_command,
-            schema=SERVICE_SCHEMA_COMMAND
-        )
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_NAME_SMARTMOW,
-            async_send_smartmowing,
-            schema=SERVICE_SCHEMA_SMARTMOWING,
-        )
-        hass.services.async_register(
-            DOMAIN, 
-            SERVICE_NAME_DELETE_ALERT, 
-            async_delete_alert, 
-            schema=SERVICE_SCHEMA_DELETE_ALERT
-        )
-        hass.services.async_register(
-            DOMAIN, 
-            SERVICE_NAME_READ_ALERT, 
-            async_read_alert, 
-            schema=SERVICE_SCHEMA_READ_ALERT
-        )
-        hass.services.async_register(
-            DOMAIN, 
-            SERVICE_NAME_DELETE_ALERT_ALL, 
-            async_delete_alert_all, 
-            schema=SERVICE_SCHEMA_DELETE_ALERT_ALL
-        )
-        hass.services.async_register(
-            DOMAIN, 
-            SERVICE_NAME_READ_ALERT_ALL, 
-            async_read_alert_all, 
-            schema=SERVICE_SCHEMA_READ_ALERT_ALL
-        )
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_NAME_DOWNLOAD_MAP,
-            async_download_map,
-            schema=SERVICE_SCHEMA_DOWNLOAD_MAP
-        )
-
-        hass.services.async_register(
-            DOMAIN,
-            SERVICE_NAME_REFRESH,
-            async_refresh,
-            schema=SERVICE_SCHEMA_REFRESH,
-        )
-
-        hass.data[DOMAIN][CONF_SERVICES_REGISTERED] = entry.entry_id
-
-    else:
-        _LOGGER.debug("Indego mower services already registered. Skipping for config entry '%s'", entry.entry_id)
-
-    return True
+    except Exception as err:
+        _LOGGER.error("Error setting up Indego integration: %s", err)
+        raise ConfigEntryAuthFailed from err
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    if unload_ok := await hass.config_entries.async_unload_platforms(entry, INDEGO_PLATFORMS):
+        data = hass.data[DOMAIN].pop(entry.entry_id)
+        api: IndegoApiClient = data["api"]
+        await api.shutdown()
 
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, INDEGO_PLATFORMS)
-    if not unload_ok:
-        return False
-
-    if CONF_SERVICES_REGISTERED in hass.data[DOMAIN] and hass.data[DOMAIN][CONF_SERVICES_REGISTERED] == entry.entry_id:
-        del hass.data[DOMAIN][CONF_SERVICES_REGISTERED]
-
-    await hass.data[DOMAIN][entry.entry_id].async_shutdown()
-    del hass.data[DOMAIN][entry.entry_id]
-
-    return True
+    return unload_ok
 
 
-class IndegoHub:
-    """Indego API hub."""
+class IndegoEntity(CoordinatorEntity):
+    """Base class for Indego entities."""
 
     def __init__(
         self,
@@ -1243,3 +544,25 @@ class IndegoHub:
         except Exception as exc:
             _LOGGER.error("Error downloading map: %s", exc)
             return False
+        coordinator: IndegoDataUpdateCoordinator,
+        device_info: dict,
+    ) -> None:
+        """Initialize Indego entity."""
+        super().__init__(coordinator)
+        self._attr_device_info = device_info
+        self._attr_has_entity_name = True
+
+    @property
+    def state(self) -> State:
+        """Return coordinator state data."""
+        return self.coordinator.state
+
+    @property
+    def calendar(self) -> Calendar:
+        """Return coordinator calendar data."""
+        return self.coordinator.calendar
+
+    @property
+    def operating_data(self) -> OperatingData:
+        """Return coordinator operating data."""
+        return self.coordinator.operating_data
