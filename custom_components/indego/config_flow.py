@@ -9,9 +9,17 @@ import voluptuous as vol
 
 from homeassistant import config_entries
 from homeassistant.const import CONF_NAME
-from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import config_entry_oauth2_flow
+from homeassistant.data_entry_flow import FlowResult, SOURCE_REAUTH
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.helpers import config_entry_oauth2_flow, selector
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.core import callback
+from homeassistant.components.application_credentials import (
+    ClientCredential,
+    async_import_client_credential,
+)
+
+from .pyindego.indego_async_client import IndegoAsyncClient
 
 from .const import (
     DOMAIN,

@@ -1194,25 +1194,25 @@ class IndegoHub:
     )
 
     async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Unload config entry."""
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, INDEGO_PLATFORMS)
-    if unload_ok:
-        indego_hub = hass.data[DOMAIN][entry.entry_id]
-        await indego_hub.async_shutdown()
-        hass.data[DOMAIN].pop(entry.entry_id)
+        """Unload config entry."""
+        unload_ok = await hass.config_entries.async_unload_platforms(entry, INDEGO_PLATFORMS)
+        if unload_ok:
+            indego_hub = hass.data[DOMAIN][entry.entry_id]
+            await indego_hub.async_shutdown()
+            hass.data[DOMAIN].pop(entry.entry_id)
 
-        # Unregister services if this was the last entry
-        if not hass.data[DOMAIN]:
-            for service in [
-                SERVICE_NAME_COMMAND,
-                SERVICE_NAME_SMARTMOW,
-                SERVICE_NAME_DELETE_ALERT,
-                SERVICE_NAME_DELETE_ALERT_ALL,
-                SERVICE_NAME_READ_ALERT,
-            ]:
-                hass.services.async_remove(DOMAIN, service)
+            # Unregister services if this was the last entry
+            if not hass.data[DOMAIN]:
+                for service in [
+                    SERVICE_NAME_COMMAND,
+                    SERVICE_NAME_SMARTMOW,
+                    SERVICE_NAME_DELETE_ALERT,
+                    SERVICE_NAME_DELETE_ALERT_ALL,
+                    SERVICE_NAME_READ_ALERT,
+                ]:
+                    hass.services.async_remove(DOMAIN, service)
 
-    return unload_ok
+        return unload_ok
 
     async def download_and_save_map(self, filename: str = None) -> bool:
         """Download the map from the mower and save it."""
