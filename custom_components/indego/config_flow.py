@@ -144,24 +144,23 @@ class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
 
 
 class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, domain=DOMAIN):
-    """Handle a config flow."""
+    """Config flow for Bosch Indego OAuth2 authentication."""
 
     DOMAIN = DOMAIN
     VERSION = 1
-    _data = {}
-    _options = {}
-    _mower_serials = None
+
+    reauth_entry: ConfigEntry | None = None
 
     @property
     def logger(self) -> logging.Logger:
         """Return logger."""
-        return _LOGGER
+        return logging.getLogger(__name__)
 
     @property
     def extra_authorize_data(self) -> dict:
         """Extra data that needs to be appended to the authorize url."""
         return {
-            "scope": "openid profile email offline_access https://prodindego.onmicrosoft.com/indego-mobile-api/Indego.Mower.User"
+            "scope": "openid offline_access"
         }
 
     async def async_step_user(
@@ -186,13 +185,44 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
         # This will launch the HA OAuth (external webpage) opener.
         return await super().async_step_pick_implementation(user_input)
 
-    async def async_oauth_create_entry(self, data: dict[str, Any]) -> FlowResult:
-        """Test connection and load the available mowers."""
-        if self.source == SOURCE_REAUTH:
-            self._data.update(data)
-        else:
-            self._data = data
-        return await self.async_step_advanced()
+    async def async_oauth_create_entry(self, data: dict) -> FlowResult:
+        """Create an oauth config entry or update existing entry for reauth."""
+        if self.reauth_entry:
+            self.hass.config_entries.async_update_entry(
+                self.reauth_entry, data=data
+            )
+            await self.hass.config_entries.async_reload(self.reauth_entry.entry_id)
+            return self.async_abort(reason="reauth_successful")
+
+        session = async_get_clientsession(self.hass)
+        try:
+            client = IndegoAsyncClient(
+                token=data["token"]["access_token"],
+                session=session,
+                raise_request_exceptions=True
+            )
+            generic_data = await client.get_generic_data()
+            
+            if not generic_data or not generic_data.alm_sn:
+                return self.async_abort(reason="no_serial_number")
+
+            await self.async_set_unique_id(generic_data.alm_sn)
+            self._abort_if_unique_id_configured()
+
+            # Use serial number as name if no name was set
+            name = generic_data.alm_name if generic_data.alm_name else generic_data.alm_sn
+
+            return self.async_create_entry(
+                title=name,
+                data={
+                    **data,
+                    CONF_MOWER_NAME: name,
+                    CONF_MOWER_SERIAL: generic_data.alm_sn,
+                }
+            )
+        except Exception as err:
+            self.logger.error("Error getting mower data: %s", err)
+            return self.async_abort(reason="cannot_connect")
 
     async def async_step_advanced(
         self, user_input: dict[str, Any] | None = None
