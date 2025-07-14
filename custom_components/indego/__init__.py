@@ -1,17 +1,26 @@
-"""Bosch Indego Mower integration."""
-from typing import Optional
+"""Component for integrating a Bosch Indego lawn mower."""
 import asyncio
 import logging
-import time
-import aiofiles
 import os
+import random
+import time
 from datetime import datetime, timedelta
 from email.utils import parsedate_to_datetime
-from aiohttp.client_exceptions import ClientResponseError
+from typing import Any, Callable
 
+import aiofiles
+from aiohttp.client_exceptions import ClientConnectorError, ClientResponseError
+from homeassistant.const import EVENT_HOMEASSISTANT_STARTED, EVENT_HOMEASSISTANT_STOP
+from homeassistant.core import CoreState, HomeAssistant
+from homeassistant.helpers import device_registry
+from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.event import (
+    async_call_later,
+    async_track_point_in_time,
+    async_track_time_interval,
+)
 import homeassistant.util.dt
 import voluptuous as vol
-from homeassistant.core import HomeAssistant, CoreState
 from homeassistant.exceptions import HomeAssistantError, ConfigEntryAuthFailed
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import (
@@ -37,7 +46,15 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.config_entry_oauth2_flow import async_get_config_entry_implementation
 from homeassistant.helpers.event import async_track_point_in_time
 from homeassistant.helpers.event import async_track_time_interval
-from pyIndego import IndegoAsyncClient
+import sys
+import os.path as path
+
+# Add local pyIndego to the Python path
+pyindego_path = path.join(path.dirname(path.dirname(path.dirname(__file__))), 'pyindego', 'pyIndego')
+if pyindego_path not in sys.path:
+    sys.path.insert(0, pyindego_path)
+
+from indego_async_client import IndegoAsyncClient
 from svgutils.transform import fromstring
 
 from .api import IndegoOAuth2Session
@@ -47,6 +64,7 @@ from .lawn_mower import IndegoLawnMower
 from .const import *
 from .sensor import IndegoSensor
 from .camera import IndegoCamera, IndegoMapCamera
+from .api_manager import IndegoApiManager
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -410,8 +428,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         enable = call.data.get(CONF_SMARTMOWING, DEFAULT_NAME_COMMANDS)
         _LOGGER.debug("Indego.send_smartmowing service called, enable: %s", enable)
 
-        await instance._indego_client.put_mow_mode(enable)
-        await instance._update_generic_data()
+        try:
+            await instance._api.get_state(force=True)  # Ensure we have latest state
+            await instance._indego_client.set_smart_mowing(enable == "on")
+            await instance._api.get_generic_data(force=True)  # Force refresh generic data
+        except Exception as exc:
+            _LOGGER.error("Failed to set smart mowing mode: %s", str(exc))
+            raise
 
     async def async_delete_alert(call):
         """Handle the service call."""
@@ -419,18 +442,30 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         index = call.data.get(SERVER_DATA_ALERT_INDEX, DEFAULT_NAME_COMMANDS)
         _LOGGER.debug("Indego.delete_alert service called with alert index: %s", index)
 
-        await instance._update_alerts()
-        await instance._indego_client.delete_alert(index)
-        await instance._update_alerts()     
+        try:
+            await instance._api.get_alerts()  # Get latest alerts first
+            await instance._indego_client.delete_alert(index)
+            # Force refresh alerts after deletion
+            instance._api.invalidate_cache('alerts')
+            await instance._api.get_alerts()
+        except Exception as exc:
+            _LOGGER.error("Failed to delete alert: %s", str(exc))
+            raise
 
     async def async_delete_alert_all(call):
         """Handle the service call."""
         instance = find_instance_for_mower_service_call(call)
         _LOGGER.debug("Indego.delete_alert_all service called")
 
-        await instance._update_alerts()
-        await instance._indego_client.delete_all_alerts()
-        await instance._update_alerts()   
+        try:
+            await instance._api.get_alerts()  # Get latest alerts first
+            await instance._indego_client.delete_all_alerts()
+            # Force refresh alerts after deletion
+            instance._api.invalidate_cache('alerts')
+            await instance._api.get_alerts()
+        except Exception as exc:
+            _LOGGER.error("Failed to delete all alerts: %s", str(exc))
+            raise
 
     async def async_read_alert(call):
         """Handle the service call."""
@@ -603,10 +638,6 @@ class IndegoHub:
         self._weekly_area_entries = []
         self._last_completed_ts = None
         self._last_state_ts = None
-        self._last_error = {}
-        self._error_log = {}
-        self._api_error_stats = {}
-        self._next_request_ts = 0
         self._online = False
         self._offline_since = None
         self._offline_failures = 0
@@ -614,10 +645,41 @@ class IndegoHub:
         self._pending_mower_detail = None
         self._debounce_remover = None
 
-        async def async_token_refresh() -> str:
-            await session.async_ensure_token_valid()
-            return session.token["access_token"]
+        self._oauth_session = session
+        self._token_refresh_task = None
+        self._token_refresh_lock = asyncio.Lock()
+        self._last_token_refresh = None
+        self._token_expires_at = None
+        self._token_refresh_margin = 300  # Refresh token 5 minutes before expiry
 
+        async def async_token_refresh() -> str:
+            """Refresh the OAuth token when needed."""
+            async with self._token_refresh_lock:
+                now = datetime.utcnow()
+                
+                # If we recently refreshed the token, return the current one
+                if (self._last_token_refresh and 
+                    (now - self._last_token_refresh).total_seconds() < 30):
+                    return self._oauth_session.token["access_token"]
+                
+                try:
+                    await self._oauth_session.async_ensure_token_valid()
+                    self._last_token_refresh = now
+                    
+                    # Calculate token expiry time
+                    expires_in = self._oauth_session.token.get("expires_in")
+                    if expires_in:
+                        self._token_expires_at = now + timedelta(seconds=int(expires_in))
+                        # Schedule the next refresh
+                        await self._schedule_token_refresh()
+                    
+                    return self._oauth_session.token["access_token"]
+                    
+                except Exception as exc:
+                    _LOGGER.error("Failed to refresh token: %s", exc)
+                    raise
+        
+        # Setup initial client configuration
         self._indego_client = IndegoAsyncClient(
             token=session.token["access_token"],
             token_refresh_method=async_token_refresh,
@@ -626,6 +688,54 @@ class IndegoHub:
             raise_request_exceptions=True
         )
         self._indego_client.set_default_header(HTTP_HEADER_USER_AGENT, user_agent)
+        
+        # Initialize API manager
+        self._api = IndegoApiManager(hass, self._indego_client)
+
+    async def _schedule_token_refresh(self):
+        """Schedule the next token refresh."""
+        if not self._token_expires_at:
+            return
+            
+        now = datetime.utcnow()
+        refresh_at = self._token_expires_at - timedelta(seconds=self._token_refresh_margin)
+        
+        if refresh_at <= now:
+            # Token is already near expiry, refresh immediately
+            if not self._token_refresh_task or self._token_refresh_task.done():
+                self._token_refresh_task = self._hass.async_create_task(
+                    self._oauth_session.async_ensure_token_valid()
+                )
+            return
+            
+        # Cancel any existing refresh task
+        if self._token_refresh_task and not self._token_refresh_task.done():
+            self._token_refresh_task.cancel()
+            
+        # Schedule new refresh task
+        delay = (refresh_at - now).total_seconds()
+        self._token_refresh_task = self._hass.async_create_task(
+            self._delayed_token_refresh(delay)
+        )
+        
+    async def _delayed_token_refresh(self, delay: float):
+        """Perform a token refresh after a delay."""
+        try:
+            await asyncio.sleep(delay)
+            await self._oauth_session.async_ensure_token_valid()
+            self._last_token_refresh = datetime.utcnow()
+            
+            # Schedule next refresh based on new token
+            if "expires_in" in self._oauth_session.token:
+                self._token_expires_at = self._last_token_refresh + timedelta(
+                    seconds=int(self._oauth_session.token["expires_in"])
+                )
+                await self._schedule_token_refresh()
+                
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            _LOGGER.error("Failed to refresh token: %s", exc)
 
     async def async_send_command_to_client(self, command: str):
         """Send a mower command to the Indego client."""
@@ -757,6 +867,15 @@ class IndegoHub:
 
         _LOGGER.debug("Starting shutdown.")
         self._shutdown = True
+
+        # Cancel token refresh task
+        if self._token_refresh_task and not self._token_refresh_task.done():
+            self._token_refresh_task.cancel()
+            try:
+                await self._token_refresh_task
+            except asyncio.CancelledError:
+                pass
+            self._token_refresh_task = None
 
         self._cancel_delayed_refresh_state()
 
@@ -931,6 +1050,7 @@ class IndegoHub:
             info["count"] += 1
         self._error_log[err_type] = info
         self._api_error_stats[err_type] = self._api_error_stats.get(err_type, 0) + 1
+
     def _in_cooldown(self) -> bool:
         """Return True if requests are currently rate limited."""
         return time.time() < self._next_request_ts
@@ -954,6 +1074,143 @@ class IndegoHub:
             self._serial,
             int(delay),
         )
+
+    def _handle_api_error(self, exc: Exception, context: str) -> None:
+        """Handle API errors with specific responses for different HTTP status codes."""
+        if isinstance(exc, ClientResponseError):
+            if exc.status == 403:
+                self._log_api_error(
+                    "forbidden",
+                    f"Access forbidden for {self._serial} during {context}. Please check your credentials.",
+                    exc
+                )
+                self.set_online_state(False)
+            elif exc.status == 429:
+                self._handle_rate_limit(exc)
+            elif exc.status == 500:
+                self._log_api_error(
+                    "server_error",
+                    f"Bosch server error for {self._serial} during {context}. Please try again later.",
+                    exc
+                )
+            else:
+                self._log_api_error(
+                    f"http_{exc.status}",
+                    f"HTTP {exc.status} error for {self._serial} during {context}: {exc.message}",
+                    exc
+                )
+        elif isinstance(exc, asyncio.TimeoutError):
+            self._log_api_error(
+                "timeout",
+                f"Request timeout for {self._serial} during {context}",
+                exc
+            )
+        else:
+            self._log_api_error(
+                "other",
+                f"Unexpected error for {self._serial} during {context}: {str(exc)}",
+                exc
+            )
+
+    def _should_retry(self, exc: Exception, attempt: int, max_retries: int = 3) -> tuple[bool, float]:
+        """Determine if request should be retried and calculate delay.
+        
+        Args:
+            exc: The exception that occurred
+            attempt: The current attempt number (0-based)
+            max_retries: Maximum number of retries allowed
+
+        Returns:
+            tuple[bool, float]: (should_retry, delay_seconds)
+        """
+        # Don't retry if we've hit the max retries
+        if attempt >= max_retries:
+            return False, 0
+
+        # Don't retry on authentication failures or bad requests
+        if isinstance(exc, ClientResponseError):
+            if exc.status in (401, 403, 400):
+                return False, 0
+            
+            # For rate limits, use the server-provided delay
+            if exc.status == 429:
+                retry_after = exc.headers.get("Retry-After") if exc.headers else None
+                if retry_after:
+                    try:
+                        # Handle both delta-seconds and HTTP-date formats
+                        try:
+                            delay = float(retry_after)
+                        except ValueError:
+                            delay_dt = parsedate_to_datetime(retry_after)
+                            delay = max(0, (delay_dt - datetime.utcnow()).total_seconds())
+                        return True, delay
+                    except (ValueError, TypeError):
+                        pass
+
+        # Calculate exponential backoff with jitter
+        base_delay = min(300, 2 ** attempt)  # Cap at 5 minutes
+        jitter = random.uniform(0, 0.1 * base_delay)  # 10% jitter
+        delay = base_delay + jitter
+
+        # Determine if we should retry based on the error type
+        should_retry = False
+        if isinstance(exc, (asyncio.TimeoutError, ClientConnectorError)):
+            # Always retry on network errors
+            should_retry = True
+        elif isinstance(exc, ClientResponseError):
+            # Retry on server errors and specific client errors
+            should_retry = (
+                exc.status >= 500  # Server errors
+                or exc.status in {408, 429}  # Request timeout, Too many requests
+            )
+
+        return should_retry, delay
+
+    async def _retry_request(self, operation: str, func: Callable, *args, **kwargs) -> Any:
+        """Execute an API request with retries and exponential backoff.
+        
+        Args:
+            operation: Description of the operation being performed
+            func: Async function to call
+            *args: Positional arguments for func
+            **kwargs: Keyword arguments for func
+            
+        Returns:
+            Any: Result from the function call
+            
+        Raises:
+            Exception: The last error encountered after all retries are exhausted
+        """
+        max_retries = 3
+        attempt = 0
+        last_exc = None
+
+        while True:
+            try:
+                # Wait for any rate limit cooldown before making the request
+                if self._in_cooldown():
+                    await asyncio.sleep(max(0, self._next_request_ts - time.time()))
+                
+                return await func(*args, **kwargs)
+                
+            except Exception as exc:
+                last_exc = exc
+                should_retry, delay = self._should_retry(exc, attempt, max_retries)
+                
+                if not should_retry:
+                    self._handle_api_error(exc, operation)
+                    raise
+
+                attempt += 1
+                _LOGGER.debug(
+                    "Retrying %s after %.1f seconds (attempt %d/%d) due to: %s",
+                    operation,
+                    delay,
+                    attempt,
+                    max_retries,
+                    str(exc),
+                )
+                await asyncio.sleep(delay)
 
     async def refresh_10m(self, _=None):
         """Refresh Indego sensors every 10m."""
@@ -1007,28 +1264,35 @@ class IndegoHub:
 
     async def download_and_store_map(self) -> None:
         """Download the current map from the mower and save it locally."""
+        _LOGGER.debug("Starting map download for %s", self._serial)
+        
         try:
-            svg_bytes = await self._indego_client.get(f"alms/{self._serial}/map")
-            if svg_bytes:
-                path = self.map_path()
-                os.makedirs(os.path.dirname(path), exist_ok=True)
-                try:
-                    async with aiofiles.open(path, "wb") as f:
-                        await f.write(svg_bytes)
-                    _LOGGER.info("Map saved in %s", path)
-                except OSError as exc:
-                    self._warn_once(
-                        "Error during saving the map [%s]: %s", self._serial, exc
-                    )
-        except ClientResponseError as exc:
-            _LOGGER.warning(
-                "Map download for %s failed: HTTP %s - %s",
-                self._serial,
-                exc.status,
-                exc.message,
-            )
-        except Exception as e:  # noqa: BLE001
-            self._warn_once("Error during saving the map [%s]: %s", self._serial, e)
+            svg_bytes = await self._api.download_map()
+            if not svg_bytes:
+                _LOGGER.warning("No map data received from API for %s", self._serial)
+                return
+                
+            path = self.map_path()
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            
+            try:
+                async with aiofiles.open(path, "wb") as f:
+                    await f.write(svg_bytes)
+                _LOGGER.info("Map saved successfully in %s (%d bytes)", path, len(svg_bytes))
+                
+                # Notify any entities that need to refresh their maps
+                for entity in self.entities.values():
+                    if hasattr(entity, "map_updated"):
+                        await entity.map_updated()
+                        
+            except OSError as exc:
+                _LOGGER.error(
+                    "Error saving the map file for %s: %s",
+                    self._serial,
+                    str(exc),
+                )
+        except Exception as exc:
+            _LOGGER.error("Failed to download map for %s: %s", self._serial, str(exc))
 
     async def start_periodic_position_update(self, interval: int | None = None):
         if interval is None:
@@ -1043,140 +1307,69 @@ class IndegoHub:
         )
 
     async def _check_position_and_state(self, now):
-        delays = [0, 1, 2, 4, 8]
+        """Check mower position and state with retry logic."""
         if self._in_cooldown():
             _LOGGER.debug(
                 "Skipping position update for %s due to cooldown", self._serial
             )
             return
-        delays = [0, 1, 2, 4]
-        for attempt, delay in enumerate(delays, 1):
-            if delay:
-                await asyncio.sleep(delay)
-            try:
-                await asyncio.wait_for(
-                    self._indego_client.update_state(
-                        force=True, longpoll_timeout=self._longpoll_timeout
-                    ),
-                    timeout=self._state_update_timeout,
-                )
-                break
-            except ClientResponseError as exc:
-                if exc.status in (502, 429) and attempt < len(delays):
-                    if exc.status == 429:
-                        self._handle_rate_limit(exc)
-                        return
-                    if exc.status == 502:
-                        if attempt == len(delays):
-                            self._log_api_error(
-                                "502",
-                                "Failed to update state for %s due to HTTP 502" % self._serial,
-                                exc,
-                            )
-                            return
-                        continue
-                if exc.status == 429:
-                    self._log_api_error(
-                        "429",
-                        "Failed to update state for %s due to HTTP 429" % self._serial,
-                        exc,
-                    )
-                    return
-                self._api_error_count += 1
-                self.entities[ENTITY_API_ERRORS].state = self._api_error_count
-                _LOGGER.warning(
-                    "Failed to update state for %s due to HTTP %s",
-                    self._serial,
-                    exc.status,
-                )
-                return
-            except asyncio.TimeoutError:
-                self._log_api_error("timeout", "Timeout on update_state() for %s – mower not available or too slow" % self._serial)
-                return
-            except Exception as exc:
-                self._log_api_error("other", "Error on update_state() for %s – actual mower_state=%s" % (self._serial, self._last_state), exc)
-                return
+
         try:
-            await asyncio.wait_for(
-                self._indego_client.update_state(
-                    force=True, longpoll_timeout=self._longpoll_timeout
-                ),
-                timeout=self._state_update_timeout,
-            )
+            # Use the new API method that combines state and position update
+            await self._api.get_state(force=True)
+            state = self._indego_client.state
+            
+            if not state:
+                _LOGGER.warning("Received invalid state from mower")
+                return
+
+            mower_state = getattr(state, "mower_state", "unknown")
+            if mower_state == "unknown":
+                _LOGGER.warning("Received unknown mower state")
+                return
+
+            # Update position if available
+            xpos = getattr(state, "svg_xPos", None)
+            ypos = getattr(state, "svg_yPos", None)
+            
+            if xpos is not None and ypos is not None:
+                if (xpos, ypos) != self._last_position:
+                    _LOGGER.debug("Position changed: x=%s, y=%s", xpos, ypos)
+                    self._last_position = (xpos, ypos)
+                    # Trigger map refresh for relevant entities
+                    for entity in self.entities.values():
+                        if hasattr(entity, "refresh_map"):
+                            await entity.refresh_map(mower_state)
+
+            # Adjust update interval based on mower state if adaptive updates are enabled
+            if self._adaptive_updates:
+                desired_interval = (
+                    60 if mower_state == "docked" else self._position_interval
+                )
+                if desired_interval != self._current_position_interval:
+                    await self.start_periodic_position_update(desired_interval)
+
         except ClientResponseError as exc:
             if exc.status == 429:
                 self._handle_rate_limit(exc)
-                return
-            raise
-        except asyncio.TimeoutError:
-            self._log_api_error(
-                "timeout",
-                "Timeout on update_state() for %s – mower not available or too slow" % self._serial,
-            )
-            return
-        except Exception as e:
-            self._log_api_error(
-                "other",
-                "Error on update_state() for %s – actual mower_state=%s" % (self._serial, self._last_state),
-                e,
-            )
-            return
-
-        state = self._indego_client.state
-        if not state:
-            self._warn_once("Received invalid state from mower")
-            return
-
-        mower_state = getattr(state, "mower_state", "unknown")
-        if mower_state == "unknown":
-            if self._last_state_ts is None:
-                _LOGGER.debug(
-                    "Received unknown state for %s on initial update – refreshing",
-                    self._serial,
-                )
             else:
                 _LOGGER.warning(
-                    "Received unknown state for %s, last success at %s – refreshing",
+                    "Position update failed for %s: HTTP %s - %s",
                     self._serial,
-                    self._last_state_ts,
+                    exc.status,
+                    exc.message,
                 )
-            try:
-                await self._update_state(longpoll=False)
-            except Exception as exc:  # noqa: BLE001
-                self._log_api_error(
-                    "other",
-                    "Retrying state refresh failed for %s: %s" % (self._serial, exc),
-                    exc,
-                )
-                return
-            state = self._indego_client.state
-            if not state:
-                _LOGGER.warning("Received invalid state from mower after retry")
-                return
-            mower_state = getattr(state, "mower_state", "unknown")
+        except asyncio.TimeoutError:
+            _LOGGER.warning(
+                "Position update timed out for %s", self._serial
+            )
+        except Exception as exc:
+            _LOGGER.warning(
+                "Position update failed for %s: %s",
+                self._serial,
+                str(exc)
+            )
 
-        xpos = getattr(state, "svg_xPos", None)
-        ypos = getattr(state, "svg_yPos", None)
-        self._last_state = mower_state
-
-
-        if self._adaptive_updates:
-            desired_interval = 60 if mower_state == "docked" else self._position_interval
-            if desired_interval != self._current_position_interval:
-                await self.start_periodic_position_update(desired_interval)
-
-        if mower_state == "docked":
-            _LOGGER.debug("Mower is docked - no position updates")
-            return
-
-        if xpos is not None and ypos is not None:
-            if (xpos, ypos) != self._last_position:
-                _LOGGER.info("Position changed: x=%s, y=%s", xpos, ypos)
-                self._last_position = (xpos, ypos)
-                for entity in self.entities.values():
-                    if hasattr(entity, "refresh_map"):
-                        await entity.refresh_map(mower_state)
-    
     async def _update_operating_data(self):
         if self._in_cooldown():
             _LOGGER.debug(
@@ -1295,375 +1488,117 @@ class IndegoHub:
             self.entities[ENTITY_LAWN_MOWER].set_cloud_connection_state(online)
 
     async def _update_state(self, longpoll: bool = True):
-        delays = [0, 1, 2, 4, 8]
-        if self._in_cooldown():
-            _LOGGER.debug("Skipping state update for %s due to cooldown", self._serial)
-            return
+        """Update the mower state."""
         try:
-            await asyncio.wait_for(
-                self._indego_client.update_state(
-                    longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
-                ),
-                timeout=self._state_update_timeout,
+            await self._api.get_state(longpoll=longpoll)
+            self.set_online_state(self._indego_client.online)
+            self._schedule_state_update(
+                self._indego_client.state_description,
+                self._indego_client.state_description_detail,
             )
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
-        delays = [0, 1, 2, 4]
-        for attempt, delay in enumerate(delays, 1):
-            if delay:
-                await asyncio.sleep(delay)
-            try:
-                await asyncio.wait_for(
-                    self._indego_client.update_state(
-                        longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
-                    ),
-                    timeout=self._state_update_timeout,
-                )
-                break
-            except ClientResponseError as exc:
-                if exc.status in (502, 429) and attempt < len(delays):
-                    if exc.status == 429:
-                        self._handle_rate_limit(exc)
-                        return
-                    if exc.status == 502:
-                        if attempt == len(delays):
-                            self._log_api_error(
-                                "502",
-                                "Failed to update state for %s due to HTTP 502" % self._serial,
-                                exc,
-                            )
-                            raise
-                        continue
-                if exc.status == 429:
-                    self._log_api_error(
-                        "429",
-                        "Failed to update state for %s due to HTTP 429" % self._serial,
-                        exc,
-                    )
-                    raise
-                self._api_error_count += 1
-                self.entities[ENTITY_API_ERRORS].state = self._api_error_count
-                self._warn_once(
-                    "Error while updating state for %s: HTTP %s",
-                    self._serial,
-                    exc.status,
-                )
-                raise
-            except Exception as exc:
-                self._warn_once(
-                    "Error while updating state for %s: %s",
-                    self._serial,
-                    exc,
-                )
-                raise
-        try:
-            await asyncio.wait_for(
-                self._indego_client.update_state(
-                    longpoll=longpoll, longpoll_timeout=self._longpoll_timeout
-                ),
-                timeout=self._state_update_timeout,
-            )
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
         except Exception as exc:
-            self._log_api_error("other", "Error while updating state for %s: %s" % (self._serial, exc), exc)
-            raise
+            self._handle_api_error(exc, "state update")
+            self.set_online_state(False)
+            raise exc
 
-        if self._shutdown:
+    async def _update_operating_data(self):
+        """Update the operating data."""
+        try:
+            await self._api.get_operating_data()
+            if self._indego_client.operating_data:
+                self._update_operating_data_entities()
+        except Exception as exc:
+            self._handle_api_error(exc, "operating data update")
+
+    async def _update_alerts(self):
+        """Update the alerts."""
+        try:
+            await self._api.get_alerts()
+            self._update_alert_entities()
+        except Exception as exc:
+            self._handle_api_error(exc, "alerts update")
+
+    async def _update_next_mow(self):
+        """Update the next mow schedule."""
+        try:
+            await self._api.get_next_mow()
+            if self._indego_client.next_mow:
+                self._update_next_mow_entities()
+        except Exception as exc:
+            _LOGGER.warning("Failed to update next mow: %s", str(exc))
+
+    async def _update_last_completed_mow(self):
+        """Update the last completed mow."""
+        try:
+            await self._api.get_last_completed_mow()
+            if self._indego_client.last_completed_mow:
+                self._update_last_completed_entities()
+        except Exception as exc:
+            _LOGGER.warning("Failed to update last completed mow: %s", str(exc))
+
+    async def _update_generic_data(self):
+        """Update the generic data."""
+        try:
+            result = await self._api.get_generic_data()
+            if self._indego_client.generic_data:
+                self._update_generic_data_entities()
+            return result
+        except Exception as exc:
+            _LOGGER.warning("Failed to update generic data: %s", str(exc))
+            return None
+
+    def _update_operating_data_entities(self):
+        """Update entity states from operating data."""
+        data = self._indego_client.operating_data
+        if not data:
             return
 
-        if self._indego_client.state is None:
-            self.set_online_state(False)
-            return  # State update failed
+        self.entities[ENTITY_BATTERY].state = data.battery.percent_adjusted
+        if ENTITY_VACUUM in self.entities:
+            self.entities[ENTITY_VACUUM].battery_level = data.battery.percent_adjusted
 
-        # Refresh Camera map if Position is available
-        new_x = self._indego_client.state.svg_xPos
-        new_y = self._indego_client.state.svg_yPos
-        mower_state = getattr(self._indego_client.state, "mower_state", "unknown")
+        self.entities[ENTITY_GARDEN_SIZE].state = data.garden.size
+        self.entities[ENTITY_AMBIENT_TEMP].state = data.battery.ambient_temp
+        self.entities[ENTITY_BATTERY_TEMP].state = data.battery.battery_temp
 
-
-        if new_x is not None and new_y is not None:
-            for entity in self.entities.values():
-                if hasattr(entity, "refresh_map"):
-                    await entity.refresh_map(mower_state)
-        
-        self.set_online_state(self._indego_client.online)
-        self._schedule_state_update(
-            self._indego_client.state_description,
-            self._indego_client.state_description_detail,
-        )
-        self.entities[ENTITY_LAWN_MOWED].state = self._indego_client.state.mowed
-        self.entities[ENTITY_RUNTIME].state = self._indego_client.state.runtime.total.cut
-        self.entities[ENTITY_BATTERY].charging = (
-            True if self._indego_client.state_description_detail == "Charging" else False
-        )
-
-        self.entities[ENTITY_LAWN_MOWED].add_attributes(
+        self.entities[ENTITY_BATTERY].add_attributes(
             {
                 "last_updated": last_updated_now(),
-                "last_session_operation_min": self._indego_client.state.runtime.session.operate,
-                "last_session_cut_min": self._indego_client.state.runtime.session.cut,
-                "last_session_charge_min": self._indego_client.state.runtime.session.charge,
+                "voltage_V": data.battery.voltage,
+                "discharge_Ah": data.battery.discharge,
+                "cycles": data.battery.cycles,
+                f"battery_temp_{UnitOfTemperature.CELSIUS}": data.battery.battery_temp,
+                f"ambient_temp_{UnitOfTemperature.CELSIUS}": data.battery.ambient_temp,
             }
         )
 
-        self.entities[ENTITY_RUNTIME].add_attributes(
-            {
-                "total_operation_time_h": self._indego_client.state.runtime.total.operate,
-                "total_mowing_time_h": self._indego_client.state.runtime.total.cut,
-                "total_charging_time_h": self._indego_client.state.runtime.total.charge,
-            }
-        )
+        runtime = data.runtime
+        self.entities[ENTITY_TOTAL_OPERATION_TIME].state = runtime.total.operate
+        self.entities[ENTITY_TOTAL_MOWING_TIME].state = runtime.total.cut
+        self.entities[ENTITY_TOTAL_CHARGING_TIME].state = runtime.total.charge
+        self.entities[ENTITY_BATTERY_CYCLES].state = data.battery.cycles
 
-        runtime = self._indego_client.state.runtime
         if runtime.session.operate:
             sessions = runtime.total.operate / (runtime.session.operate / 60)
             if sessions:
                 avg = runtime.total.cut / sessions
                 self.entities[ENTITY_AVERAGE_MOW_TIME].state = round(avg * 60, 1)
 
-        if hasattr(self, "_weekly_area_entries"):
-            total_area = sum(float(a) for t, a in self._weekly_area_entries)
-            self.entities[ENTITY_WEEKLY_AREA].state = total_area
-
-        if ENTITY_VACUUM in self.entities:
-            self.entities[ENTITY_VACUUM].indego_state = self._indego_client.state.state
-            self.entities[ENTITY_VACUUM].battery_charging = self.entities[ENTITY_BATTERY].charging
-
-        if ENTITY_LAWN_MOWER in self.entities:
-            self.entities[ENTITY_LAWN_MOWER].indego_state = self._indego_client.state.state
-
-    async def _update_generic_data(self):
-        if self._in_cooldown():
-            _LOGGER.debug(
-                "Skipping generic data update for %s due to cooldown", self._serial
-            )
-            return
-        try:
-            await self._indego_client.update_generic_data()
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
-
-        if self._indego_client.generic_data:
-            if ENTITY_MOWING_MODE in self.entities:
-                self.entities[
-                    ENTITY_MOWING_MODE
-                ].state = self._indego_client.generic_data.mowing_mode_description
-
-            if ENTITY_FIRMWARE in self.entities:
-                self.entities[ENTITY_FIRMWARE].state = (
-                    self._indego_client.generic_data.alm_firmware_version
-                )
-
-        return self._indego_client.generic_data
-
-    async def _update_alerts(self):
-        if self._in_cooldown():
-            _LOGGER.debug(
-                "Skipping alerts update for %s due to cooldown", self._serial
-            )
-            return
-        try:
-            await self._indego_client.update_alerts()
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
-
+    def _update_alert_entities(self):
+        """Update entity states from alerts data."""
         self.entities[ENTITY_ALERT].state = self._indego_client.alerts_count > 0
 
         if self._indego_client.alerts:
-            self.entities[ENTITY_ALERT].add_attributes(
-                {
-                    "alerts_count": self._indego_client.alerts_count,
-                    "last_alert_error_code": self._indego_client.alerts[0].error_code,
-                    "last_alert_message": self._indego_client.alerts[0].message,
-                    "last_alert_date": format_indego_date(self._indego_client.alerts[0].date),
-                    "last_alert_read": self._indego_client.alerts[0].read_status,
-                }, False
-            )
+            attributes = {
+                "alerts_count": self._indego_client.alerts_count,
+                "last_alert_error_code": self._indego_client.alerts[0].error_code,
+                "last_alert_message": self._indego_client.alerts[0].message,
+                "last_alert_date": format_indego_date(self._indego_client.alerts[0].date),
+                "last_alert_read": self._indego_client.alerts[0].read_status,
+            }
 
-            # It's not recommended to track full alerts, disabled by default.
-            # See the developer docs: https://developers.home-assistant.io/docs/core/entity/
             if self._features[CONF_SHOW_ALL_ALERTS]:
-                alert_index = 0
                 for index, alert in enumerate(self._indego_client.alerts):
-                    self.entities[ENTITY_ALERT].add_attributes({
-                        ("alert_%i" % index): "%s: %s" % (format_indego_date(alert.date), alert.message)
-                    }, False)
-                    alert_index = index
+                    attributes[f"alert_{index}"] = f"{format_indego_date(alert.date)}: {alert.message}"
 
-                # Clear any other alerts that no longer exist.
-                alert_index += 1
-                while self.entities[ENTITY_ALERT].clear_attribute("alert_%i" % alert_index, False):
-                    alert_index += 1
-
-            self.entities[ENTITY_ALERT].async_schedule_update_ha_state()
-
-        else:
-            self.entities[ENTITY_ALERT].set_attributes(
-                {
-                    "alerts_count": self._indego_client.alerts_count
-                }
-            )
-
-    async def _update_updates_available(self):
-        if self._in_cooldown():
-            _LOGGER.debug(
-                "Skipping update check for %s due to cooldown", self._serial
-            )
-            return
-        try:
-            await self._indego_client.update_updates_available()
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
-
-        self.entities[ENTITY_UPDATE_AVAILABLE].state = self._indego_client.update_available
-
-    async def _update_last_completed_mow(self):
-        if self._in_cooldown():
-            _LOGGER.debug(
-                "Skipping last completed mow update for %s due to cooldown",
-                self._serial,
-            )
-            return
-        try:
-            await self._indego_client.update_last_completed_mow()
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
-
-        if self._indego_client.last_completed_mow:
-            self.entities[
-                ENTITY_LAST_COMPLETED
-            ].state = self._indego_client.last_completed_mow.isoformat()
-
-            self.entities[ENTITY_LAWN_MOWED].add_attributes(
-                {
-                    "last_completed_mow": format_indego_date(self._indego_client.last_completed_mow)
-                }
-            )
-
-            if self._last_completed_ts != self._indego_client.last_completed_mow:
-                self._last_completed_ts = self._indego_client.last_completed_mow
-                size = self.entities[ENTITY_GARDEN_SIZE].state
-                if size is not None:
-                    try:
-                        size_val = float(size)
-                    except (TypeError, ValueError):
-                        _LOGGER.debug("Invalid garden size value: %s", size)
-                        size_val = None
-                    if size_val is not None:
-                        self._weekly_area_entries.append((self._last_completed_ts, size_val))
-                        week_ago = utcnow() - timedelta(days=7)
-                        self._weekly_area_entries = [ (t, a) for t, a in self._weekly_area_entries if t >= week_ago ]
-
-    async def _update_next_mow(self):
-        if self._in_cooldown():
-            _LOGGER.debug("Skipping next mow update for %s due to cooldown", self._serial)
-            return
-        try:
-            await self._indego_client.update_next_mow()
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            _LOGGER.warning(
-                "Failed to update next mow for %s: HTTP %s - %s",
-                self._serial,
-                exc.status,
-                exc.message,
-            )
-            return
-        except Exception as exc:
-            self._log_api_error(
-                "other",
-                "Failed to update next mow for %s: %s" % (self._serial, exc),
-                exc,
-            )
-            return
-
-        if self._indego_client.next_mow:
-            self.entities[ENTITY_NEXT_MOW].state = self._indego_client.next_mow.isoformat()
-
-            next_mow = format_indego_date(self._indego_client.next_mow)
-
-            self.entities[ENTITY_NEXT_MOW].add_attributes(
-                {"next_mow": next_mow}
-            )
-
-            self.entities[ENTITY_LAWN_MOWED].add_attributes(
-                {"next_mow": next_mow}
-            )
-
-    async def _update_forecast(self):
-        if self._in_cooldown():
-            _LOGGER.debug("Skipping forecast update for %s due to cooldown", self._serial)
-            return
-        try:
-            await self._indego_client.update_predictive_calendar()
-        except ClientResponseError as exc:
-            if exc.status == 429:
-                self._handle_rate_limit(exc)
-                return
-            raise
-
-        if self._indego_client.predictive_calendar:
-            calendar = self._indego_client.predictive_calendar
-            forecast = calendar[0] if isinstance(calendar, list) else calendar
-
-            if isinstance(forecast, dict):
-                recommendation = forecast.get("recommendation")
-                rain_chance = forecast.get("rainChance")
-                next_start = forecast.get("nextStart")
-            else:
-                recommendation = getattr(forecast, "recommendation", None)
-                rain_chance = getattr(forecast, "rainChance", None)
-                next_start = getattr(forecast, "nextStart", None)
-
-            self.entities[ENTITY_FORECAST].state = recommendation
-
-            self.entities[ENTITY_FORECAST].set_attributes(
-                {
-                    "rain_probability": rain_chance,
-                    "recommended_next_mow": next_start,
-                }
-            )
-
-    async def _update_api_error_sensor(self, _=None):
-        """Update the API error sensor with aggregated counts."""
-        if ENTITY_API_ERRORS not in self.entities:
-            return
-        self.entities[ENTITY_API_ERRORS].state = sum(self._api_error_stats.values())
-        self.entities[ENTITY_API_ERRORS].set_attributes(dict(self._api_error_stats))
-
-    @property
-    def serial(self) -> str:
-        return self._serial
-
-    @property
-    def client(self) -> IndegoAsyncClient:
-        return self._indego_client
-
-    @property
-    def progress_line_width(self) -> int:
-        return self._progress_line_width
-
-    @property
-    def progress_line_color(self) -> str:
-        return self._progress_line_color
+            self.entities[ENTITY_ALERT].set_attributes(attributes)

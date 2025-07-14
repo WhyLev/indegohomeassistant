@@ -12,7 +12,15 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.config_entries import OptionsFlowWithConfigEntry, ConfigEntry, ConfigFlowResult, SOURCE_REAUTH, UnknownEntry
 from homeassistant.core import callback
 
-from pyIndego import IndegoAsyncClient
+import sys
+import os.path as path
+
+# Add local pyIndego to the Python path
+pyindego_path = path.join(path.dirname(path.dirname(path.dirname(__file__))), 'pyindego', 'pyIndego')
+if pyindego_path not in sys.path:
+    sys.path.insert(0, pyindego_path)
+
+from indego_async_client import IndegoAsyncClient
 
 from .const import (
     DOMAIN,
