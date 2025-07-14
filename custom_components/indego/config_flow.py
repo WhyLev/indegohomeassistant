@@ -1,51 +1,42 @@
+"""Config flow for Bosch Indego."""
+import logging
+import os.path as path
+import sys
 from typing import Final, Any
 from collections.abc import Mapping
-import logging
 
 import voluptuous as vol
 
+from homeassistant import config_entries
+from homeassistant.const import CONF_NAME
 from homeassistant.data_entry_flow import FlowResult
-from homeassistant.helpers import selector
 from homeassistant.helpers import config_entry_oauth2_flow
-from homeassistant.components.application_credentials import ClientCredential, async_import_client_credential
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.config_entries import OptionsFlowWithConfigEntry, ConfigEntry, ConfigFlowResult, SOURCE_REAUTH, UnknownEntry
-from homeassistant.core import callback
-
-import sys
-import os.path as path
-
-# Add local pyIndego to the Python path
-pyindego_path = path.join(path.dirname(path.dirname(path.dirname(__file__))), 'pyindego', 'pyIndego')
-if pyindego_path not in sys.path:
-    sys.path.insert(0, pyindego_path)
-
-from indego_async_client import IndegoAsyncClient
 
 from .const import (
     DOMAIN,
     CONF_MOWER_SERIAL,
     CONF_MOWER_NAME,
+    CONF_USER_AGENT,
     CONF_EXPOSE_INDEGO_AS_MOWER,
     CONF_EXPOSE_INDEGO_AS_VACUUM,
     CONF_SHOW_ALL_ALERTS,
-    CONF_USER_AGENT,
     CONF_POSITION_UPDATE_INTERVAL,
     CONF_ADAPTIVE_POSITION_UPDATES,
     CONF_PROGRESS_LINE_WIDTH,
     CONF_PROGRESS_LINE_COLOR,
+    CONF_STATE_UPDATE_TIMEOUT,
+    CONF_LONGPOLL_TIMEOUT,
     DEFAULT_POSITION_UPDATE_INTERVAL,
     DEFAULT_ADAPTIVE_POSITION_UPDATES,
+    DEFAULT_STATE_UPDATE_TIMEOUT,
+    DEFAULT_LONGPOLL_TIMEOUT,
     MAP_PROGRESS_LINE_WIDTH,
     MAP_PROGRESS_LINE_COLOR,
-    CONF_STATE_UPDATE_TIMEOUT,
-    DEFAULT_STATE_UPDATE_TIMEOUT,
-    CONF_LONGPOLL_TIMEOUT,
-    DEFAULT_LONGPOLL_TIMEOUT,
-    OAUTH2_CLIENT_ID,
     HTTP_HEADER_USER_AGENT,
     HTTP_HEADER_USER_AGENT_DEFAULT,
-    HTTP_HEADER_USER_AGENT_DEFAULTS
+    HTTP_HEADER_USER_AGENT_DEFAULTS,
+    OAUTH2_CLIENT_ID
 )
 
 _LOGGER: Final = logging.getLogger(__name__)
@@ -69,11 +60,13 @@ def default_user_agent_in_config(config: dict) -> bool:
     return False
 
 
-class IndegoOptionsFlowHandler(OptionsFlowWithConfigEntry):
+class IndegoOptionsFlowHandler(config_entries.OptionsFlowWithConfigEntry):
+    """Indego options flow."""
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
         super().__init__(config_entry)
+        self._options = dict(config_entry.options)
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -148,8 +141,36 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
 
     DOMAIN = DOMAIN
     VERSION = 1
+    reauth_entry: config_entries.ConfigEntry | None = None
 
-    reauth_entry: ConfigEntry | None = None
+    @property
+    def logger(self) -> logging.Logger:
+        """Return logger."""
+        return logging.getLogger(__name__)
+
+    @property
+    def extra_authorize_data(self) -> dict:
+        """Extra data that needs to be appended to the authorize url."""
+        return {
+            "scope": "openid offline_access",
+            "response_type": "code",
+            "response_mode": "query"
+        }
+
+    async def async_step_reauth(self, entry_data: Mapping[str, Any]) -> FlowResult:
+        """Perform reauth upon an API authentication error."""
+        self.reauth_entry = self.hass.config_entries.async_get_entry(
+            self.context["entry_id"]
+        )
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Dialog that informs the user that reauth is required."""
+        if user_input is None:
+            return self.async_show_form(step_id="reauth_confirm")
+        return await self.async_step_user()
 
     @property
     def logger(self) -> logging.Logger:
@@ -195,13 +216,15 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
             return self.async_abort(reason="reauth_successful")
 
         session = async_get_clientsession(self.hass)
+        client = None
         try:
             client = IndegoAsyncClient(
                 token=data["token"]["access_token"],
                 session=session,
                 raise_request_exceptions=True
             )
-            generic_data = await client.get_generic_data()
+            await client.get_generic_data()
+            generic_data = client.generic_data
             
             if not generic_data or not generic_data.alm_sn:
                 return self.async_abort(reason="no_serial_number")
@@ -223,6 +246,9 @@ class IndegoFlowHandler(config_entry_oauth2_flow.AbstractOAuth2FlowHandler, doma
         except Exception as err:
             self.logger.error("Error getting mower data: %s", err)
             return self.async_abort(reason="cannot_connect")
+        finally:
+            if client:
+                await client.close()
 
     async def async_step_advanced(
         self, user_input: dict[str, Any] | None = None
