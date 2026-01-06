@@ -19,8 +19,8 @@ API_BACKOFF_FACTOR: Final = 1.5
 
 # Update intervals
 UPDATE_INTERVAL: Final = timedelta(minutes=5)
-POSITION_UPDATE_INTERVAL: Final = timedelta(seconds=10)
-STATE_UPDATE_INTERVAL: Final = timedelta(seconds=5)
+POSITION_UPDATE_INTERVAL: Final = timedelta(seconds=60)
+STATE_UPDATE_INTERVAL: Final = timedelta(seconds=30)
 CALENDAR_UPDATE_INTERVAL: Final = timedelta(minutes=15)
 
 # Cache TTLs
@@ -127,7 +127,7 @@ API_ERROR_LOG_INTERVAL: Final = 300
 # Map configuration
 MAP_PROGRESS_LINE_WIDTH: Final = 6
 MAP_PROGRESS_LINE_COLOR: Final = "#0000FF"
-MAP_UPDATE_INTERVAL: Final = timedelta(minutes=5)
+MAP_UPDATE_INTERVAL: Final = timedelta(minutes=10)
 
 # Event constants
 DATA_UPDATED: Final = f"{DOMAIN}_data_updated"

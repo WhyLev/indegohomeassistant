@@ -20,6 +20,11 @@ from .const import (
     STATE_UPDATE_INTERVAL,
     CALENDAR_UPDATE_INTERVAL,
 )
+from .exceptions import (
+    IndegoAuthenticationError,
+    IndegoConnectionError,
+    IndegoRequestError,
+)
 from .models import State, Calendar, OperatingData, Alert
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,32 +80,51 @@ class IndegoDataUpdateCoordinator(DataUpdateCoordinator):
                 "alerts": self.alerts,
             }
 
+        except IndegoAuthenticationError as err:
+            _LOGGER.error("Authentication failed: %s", err)
+            raise ConfigEntryAuthFailed from err
+        except IndegoConnectionError as err:
+            _LOGGER.error("Connection error: %s", err)
+            raise UpdateFailed(f"Connection error: {err}") from err
+        except IndegoRequestError as err:
+            _LOGGER.error("Invalid request: %s", err)
+            raise UpdateFailed(f"Invalid request: {err}") from err
         except Exception as err:
-            raise UpdateFailed(f"Error communicating with Indego API: {err}") from err
+            _LOGGER.exception("Unexpected error communicating with Indego API")
+            raise UpdateFailed(f"Unexpected error: {err}") from err
 
     async def _update_calendar(self) -> None:
         """Update calendar data."""
         try:
             calendar_data = await self.api.get_calendar()
             self.calendar = Calendar.from_dict(calendar_data)
-        except Exception as err:
-            _LOGGER.error("Error updating calendar: %s", err)
+            _LOGGER.debug("Successfully updated calendar")
+        except IndegoRequestError as err:
+            _LOGGER.warning("Could not update calendar: %s", err)
+        except Exception:
+            _LOGGER.exception("Unexpected error updating calendar")
 
     async def _update_operating_data(self) -> None:
         """Update operating data."""
         try:
             operating_data = await self.api.get_generic_data()
             self.operating_data = OperatingData.from_dict(operating_data)
-        except Exception as err:
-            _LOGGER.error("Error updating operating data: %s", err)
+            _LOGGER.debug("Successfully updated operating data")
+        except IndegoRequestError as err:
+            _LOGGER.warning("Could not update operating data: %s", err)
+        except Exception:
+            _LOGGER.exception("Unexpected error updating operating data")
 
     async def _update_alerts(self) -> None:
         """Update alerts."""
         try:
             alerts_data = await self.api.get_alerts()
             self.alerts = [Alert.from_dict(alert) for alert in alerts_data]
-        except Exception as err:
-            _LOGGER.error("Error updating alerts: %s", err)
+            _LOGGER.debug("Successfully updated alerts")
+        except IndegoRequestError as err:
+            _LOGGER.warning("Could not update alerts: %s", err)
+        except Exception:
+            _LOGGER.exception("Unexpected error updating alerts")
 
     def calendar_needs_update(self) -> bool:
         """Check if calendar needs update."""

@@ -45,6 +45,7 @@ class Runtime:
     total_charging: int
     total_mowing: int
     total_docked: int
+    total_mowing_sessions: int
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> Runtime:
@@ -53,7 +54,8 @@ class Runtime:
             total_operation=data.get("total_operation", 0),
             total_charging=data.get("total_charging", 0),
             total_mowing=data.get("total_mowing", 0),
-            total_docked=data.get("total_docked", 0)
+            total_docked=data.get("total_docked", 0),
+            total_mowing_sessions=data.get("total_mowing_sessions", 0)
         )
 
 
