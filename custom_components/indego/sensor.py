@@ -1,7 +1,7 @@
 """Class for Indego Sensors."""
 import logging
 
-from homeassistant.components.sensor import SensorEntity, ENTITY_ID_FORMAT as SENSOR_FORMAT
+from homeassistant.components.sensor import SensorEntity, ENTITY_ID_FORMAT as SENSOR_FORMAT, SensorEntityDescription
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.config_entries import ConfigEntry
@@ -9,10 +9,32 @@ from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.icon import icon_for_battery_level
 from homeassistant.helpers.entity import DeviceInfo
 
+from homeassistant.const import TIME_MINUTES, AREA_SQUARE_METERS
 from .mixins import IndegoEntity
-from .const import DATA_UPDATED, DOMAIN
+from .const import DATA_UPDATED, DOMAIN, ENTITY_BATTERY_CYCLES, ENTITY_AVERAGE_MOW_TIME, ENTITY_WEEKLY_AREA
 
 _LOGGER = logging.getLogger(__name__)
+
+
+INDEGO_SENSORS: tuple[SensorEntityDescription, ...] = (
+    SensorEntityDescription(
+        key=ENTITY_BATTERY_CYCLES,
+        name="Battery Cycles",
+        icon="mdi:battery-heart-variant",
+    ),
+    SensorEntityDescription(
+        key=ENTITY_AVERAGE_MOW_TIME,
+        name="Average Mow Time",
+        icon="mdi:clock-outline",
+        native_unit_of_measurement=TIME_MINUTES,
+    ),
+    SensorEntityDescription(
+        key=ENTITY_WEEKLY_AREA,
+        name="Weekly Area Mowed",
+        icon="mdi:texture-box",
+        native_unit_of_measurement=AREA_SQUARE_METERS,
+    ),
+)
 
 
 async def async_setup_entry(
@@ -20,14 +42,44 @@ async def async_setup_entry(
     config_entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up the binary sensor platform."""
-    async_add_entities(
-        [
-            entity
-            for entity in hass.data[DOMAIN][config_entry.entry_id].entities.values()
-            if isinstance(entity, IndegoSensor)
-        ]
-    )
+    """Set up the sensor platform."""
+    indego_hub = hass.data[DOMAIN][config_entry.entry_id]
+    entities = [
+        entity
+        for entity in indego_hub.entities.values()
+        if isinstance(entity, IndegoSensor)
+    ]
+
+    for description in INDEGO_SENSORS:
+        if description.key == ENTITY_BATTERY_CYCLES:
+            entities.append(
+                IndegoBatteryCyclesSensor(
+                    f"{indego_hub.name}_{description.key}",
+                    description.name,
+                    description.icon,
+                    indego_hub.device_info,
+                )
+            )
+        elif description.key == ENTITY_AVERAGE_MOW_TIME:
+            entities.append(
+                IndegoAverageMowTimeSensor(
+                    f"{indego_hub.name}_{description.key}",
+                    description.name,
+                    description.icon,
+                    indego_hub.device_info,
+                )
+            )
+        elif description.key == ENTITY_WEEKLY_AREA:
+            entities.append(
+                IndegoWeeklyAreaSensor(
+                    f"{indego_hub.name}_{description.key}",
+                    description.name,
+                    description.icon,
+                    indego_hub.device_info,
+                )
+            )
+
+    async_add_entities(entities, True)
 
 
 class IndegoSensor(IndegoEntity, SensorEntity):
@@ -97,3 +149,53 @@ class IndegoSensor(IndegoEntity, SensorEntity):
     def unit_of_measurement(self) -> str:
         """Return the unit of measurement."""
         return self._unit
+
+
+class IndegoBatteryCyclesSensor(IndegoSensor):
+    """Sensor for battery cycles."""
+
+    def __init__(self, entity_id, name, icon, device_info: DeviceInfo):
+        """Initialize the sensor."""
+        super().__init__(entity_id, name, icon, None, None, None, device_info)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        if op_data := self._indego_hub.coordinator.data.get("operating_data"):
+            self.state = op_data.battery.cycles
+        super()._handle_coordinator_update()
+
+
+class IndegoAverageMowTimeSensor(IndegoSensor):
+    """Sensor for average mow time."""
+
+    def __init__(self, entity_id, name, icon, device_info: DeviceInfo):
+        """Initialize the sensor."""
+        super().__init__(entity_id, name, icon, None, TIME_MINUTES, None, device_info)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.state = 0
+        if op_data := self._indego_hub.coordinator.data.get("operating_data"):
+            total_mowing_time = op_data.runtime.total_mowing
+            total_mowing_sessions = op_data.runtime.total_mowing_sessions
+            if total_mowing_sessions > 0:
+                self.state = total_mowing_time / total_mowing_sessions
+        super()._handle_coordinator_update()
+
+
+class IndegoWeeklyAreaSensor(IndegoSensor):
+    """Sensor for weekly area mowed."""
+
+    def __init__(self, entity_id, name, icon, device_info: DeviceInfo):
+        """Initialize the sensor."""
+        super().__init__(entity_id, name, icon, None, AREA_SQUARE_METERS, None, device_info)
+
+    @callback
+    def _handle_coordinator_update(self) -> None:
+        """Handle updated data from the coordinator."""
+        self.state = 0
+        if op_data := self._indego_hub.coordinator.data.get("operating_data"):
+            self.state = op_data.garden.get("weekly_mowing", 0)
+        super()._handle_coordinator_update()
